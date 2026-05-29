@@ -1,0 +1,16 @@
+poetry 
+numpy 
+pandas 
+jupyter 
+quarto 
+quarto-cli 
+wheel 
+requests 
+matplotlib 
+seaborn 
+scipy 
+scikit-learn 
+plotly 
+lxml 
+beautifulsoup4  
+uv
