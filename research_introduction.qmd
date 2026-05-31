@@ -1,0 +1,17 @@
+---
+title: "Research Introduction: Salary & Compensation Trends"
+author: "Team C"
+date: 2026-05-31
+format: 
+  html:
+    bibliography: references.bib
+    csl: csl/econometrica.csl
+    toc: true
+---
+
+Thanks to AI-boosted productivity, even workers in high-wage roles that are heavily exposed to AI, saw their share of total employment grow by about 3% over five years @murray2025aiLaborMarket. 
+
+
+
+
+## References
