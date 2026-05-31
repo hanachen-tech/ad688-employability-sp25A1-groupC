@@ -1,5 +1,9 @@
 project:
   type: website
+  render:
+    - "*.qmd"
+    - "**/*.qmd"
+    - "!projenv/"
 
 website:
   title: "ad688-employability-sp25A1-groupC"
@@ -8,6 +12,10 @@ website:
       - href: index.qmd
         text: Home
       - about.qmd
+      - href: research_introduction.qmd
+        text: Research Introduction
+      - href: career_plan.qmd
+        text: Career Plan
 
 format:
   html:
