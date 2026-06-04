@@ -1,0 +1,367 @@
+---
+title: "Salary & Compensation Trends"
+author: "Nutchanon Chaiyaratana"
+date: today
+format:
+  html:
+    theme: cerulean
+    toc: true
+    toc-depth: 2
+    embed-resources: true
+date-modified: today
+date-format: long
+execute:
+  echo: true
+  eval: true
+  freeze: false
+  warning: false
+  message: false
+---
+## Salary & Compensation Trends
+
+This section analyzes salary and compensation patterns in 2024 job postings using the Lightcast dataset. The goal is to understand how salaries vary across occupations, industries, locations, employment types, and remote work arrangements.
+
+Because salary information is not available for every job posting, this analysis focuses on records with valid salary values greater than zero.
+
+```{python}
+#| echo: true
+#| output: false
+#| warning: false
+#| message: false
+
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, monotonically_increasing_id
+
+spark = SparkSession.builder \
+    .config("spark.driver.host", "localhost") \
+    .appName("SalaryCompensationTrends") \
+    .getOrCreate()
+
+spark.catalog.clearCache()
+
+df = spark.read.option("header", "true") \
+    .option("inferSchema", "true") \
+    .option("multiLine", "true") \
+    .option("escape", "\"") \
+    .csv("data/lightcast_job_postings.csv")
+
+df.createOrReplaceTempView("raw_jobs")
+# Basic cleaning: remove records without a job posting ID
+
+df_clean = df.filter(col("ID").isNotNull())
+
+df_clean.createOrReplaceTempView("raw_jobs")
+
+print("Original rows:", df.count())
+
+print("Rows after removing missing ID:", df_clean.count())
+
+# companies table
+companies_df = df_clean.select(
+    col("COMPANY").alias("company_id"),
+    col("COMPANY").alias("company"),
+    col("COMPANY_NAME").alias("company_name"),
+    col("COMPANY_RAW").alias("company_raw"),
+    col("COMPANY_IS_STAFFING").alias("company_is_staffing")
+).dropDuplicates(["company_id"])
+
+companies_df.createOrReplaceTempView("companies")
+
+# industries table
+industries_df = df_clean.select(
+    col("NAICS_2022_6").alias("naics_2022_6"),
+    col("NAICS_2022_6_NAME").alias("naics_2022_6_name")
+).dropDuplicates()
+
+industries_df = industries_df.withColumn(
+    "industry_id",
+    monotonically_increasing_id()
+)
+
+industries_df = industries_df.select(
+    "industry_id",
+    "naics_2022_6",
+    "naics_2022_6_name"
+)
+
+industries_df.createOrReplaceTempView("industries")
+
+# locations table
+locations_df = df_clean.select(
+    col("LOCATION").alias("location"),
+    col("CITY_NAME").alias("city_name"),
+    col("STATE_NAME").alias("state_name"),
+    col("COUNTY_NAME").alias("county_name"),
+    col("MSA").alias("msa"),
+    col("MSA_NAME").alias("msa_name")
+).dropDuplicates()
+
+locations_df = locations_df.withColumn(
+    "location_id",
+    monotonically_increasing_id()
+)
+
+locations_df = locations_df.select(
+    "location_id",
+    "location",
+    "city_name",
+    "state_name",
+    "county_name",
+    "msa",
+    "msa_name"
+)
+
+locations_df.createOrReplaceTempView("locations")
+
+# occupations table
+occupations_df = df_clean.select(
+    col("SOC_5").alias("soc_5"),
+    col("SOC_5_NAME").alias("soc_5_name"),
+    col("LOT_SPECIALIZED_OCCUPATION").alias("specialized_occupation"),
+    col("LOT_SPECIALIZED_OCCUPATION_NAME").alias("specialized_occupation_name"),
+    col("LOT_OCCUPATION_GROUP").alias("occupation_group"),
+    col("LOT_OCCUPATION_GROUP_NAME").alias("occupation_group_name")
+).dropDuplicates()
+
+occupations_df = occupations_df.withColumn(
+    "occupation_id",
+    monotonically_increasing_id()
+)
+
+occupations_df = occupations_df.select(
+    "occupation_id",
+    "soc_5",
+    "soc_5_name",
+    "specialized_occupation",
+    "specialized_occupation_name",
+    "occupation_group",
+    "occupation_group_name"
+)
+
+occupations_df.createOrReplaceTempView("occupations")
+
+# job postings table
+job_with_industry = df_clean.join(
+    industries_df,
+    (
+        (df["NAICS_2022_6"] == industries_df["naics_2022_6"]) &
+        (df["NAICS_2022_6_NAME"] == industries_df["naics_2022_6_name"])
+    ),
+    "left"
+)
+
+job_with_location = job_with_industry.join(
+    locations_df,
+    (
+        (job_with_industry["LOCATION"] == locations_df["location"]) &
+        (job_with_industry["CITY_NAME"] == locations_df["city_name"]) &
+        (job_with_industry["STATE_NAME"] == locations_df["state_name"]) &
+        (job_with_industry["COUNTY_NAME"] == locations_df["county_name"]) &
+        (job_with_industry["MSA"] == locations_df["msa"]) &
+        (job_with_industry["MSA_NAME"] == locations_df["msa_name"])
+    ),
+    "left"
+)
+
+job_with_keys = job_with_location.join(
+    occupations_df,
+    (
+        (job_with_location["SOC_5"] == occupations_df["soc_5"]) &
+        (job_with_location["SOC_5_NAME"] == occupations_df["soc_5_name"]) &
+        (job_with_location["LOT_SPECIALIZED_OCCUPATION"] == occupations_df["specialized_occupation"]) &
+        (job_with_location["LOT_SPECIALIZED_OCCUPATION_NAME"] == occupations_df["specialized_occupation_name"]) &
+        (job_with_location["LOT_OCCUPATION_GROUP"] == occupations_df["occupation_group"]) &
+        (job_with_location["LOT_OCCUPATION_GROUP_NAME"] == occupations_df["occupation_group_name"])
+    ),
+    "left"
+)
+
+job_postings_df = job_with_keys.select(
+    job_with_keys["ID"].alias("id"),
+    job_with_keys["TITLE_CLEAN"].alias("title_clean"),
+    job_with_keys["COMPANY"].alias("company_id"),
+    col("industry_id"),
+    col("occupation_id"),
+    job_with_keys["EMPLOYMENT_TYPE_NAME"].alias("employment_type_name"),
+    job_with_keys["REMOTE_TYPE_NAME"].alias("remote_type_name"),
+    job_with_keys["BODY"].alias("body"),
+    job_with_keys["MIN_YEARS_EXPERIENCE"].alias("min_years_experience"),
+    job_with_keys["MAX_YEARS_EXPERIENCE"].alias("max_years_experience"),
+    job_with_keys["SALARY"].alias("salary"),
+    job_with_keys["SALARY_FROM"].alias("salary_from"),
+    job_with_keys["SALARY_TO"].alias("salary_to"),
+    col("location_id"),
+    job_with_keys["POSTED"].alias("posted"),
+    job_with_keys["EXPIRED"].alias("expired"),
+    job_with_keys["DURATION"].alias("duration")
+).filter(
+    col("id").isNotNull()
+).dropDuplicates(["id"])
+
+job_postings_df.createOrReplaceTempView("job_postings")
+
+job_postings_df.createOrReplaceTempView("job_postings")
+```
+### Validate Registered SQL Tables
+Before running the salary analysis queries, I validate that all relational tables were created and registered in Spark SQL.
+
+```{python}
+
+def style_table(df, format_dict=None):
+
+    styled = df.style
+
+    if format_dict is not None:
+
+        styled = styled.format(format_dict)
+
+    styled = styled.set_properties(**{
+
+        "text-align": "left",
+
+        "white-space": "normal",
+
+        "border": "1px solid black"
+
+    }).set_table_styles([
+
+        {
+
+            "selector": "th",
+
+            "props": [
+
+                ("border", "1px solid black"),
+
+                ("text-align", "left"),
+
+                ("background-color", "#f2f2f2")
+
+            ]
+
+        },
+
+        {
+
+            "selector": "td",
+
+            "props": [
+
+                ("border", "1px solid black"),
+
+                ("padding", "6px")
+
+            ]
+
+        },
+
+        {
+
+            "selector": "table",
+
+            "props": [
+
+                ("border-collapse", "collapse")
+
+            ]
+
+        }
+
+    ])
+
+    return styled
+
+```
+```{python}
+table_counts = spark.sql("""
+SELECT 'job_postings' AS table_name, COUNT(*) AS row_count FROM job_postings
+UNION ALL
+SELECT 'companies' AS table_name, COUNT(*) AS row_count FROM companies
+UNION ALL
+SELECT 'industries' AS table_name, COUNT(*) AS row_count FROM industries
+UNION ALL
+SELECT 'locations' AS table_name, COUNT(*) AS row_count FROM locations
+UNION ALL
+SELECT 'occupations' AS table_name, COUNT(*) AS row_count FROM occupations
+""")
+
+table_counts_pd = table_counts.toPandas()
+
+style_table(table_counts_pd, {
+    "row_count": "{:,.0f}"
+})
+```
+
+### Preview Companies Table
+
+```{python}
+companies_preview = companies_df.select(
+    "company_id",
+    "company",
+    "company_name",
+    "company_raw",
+    "company_is_staffing"
+).limit(5).toPandas()
+
+style_table(companies_preview)
+```
+
+### Preview Industries Table
+
+```{python}
+industries_preview = industries_df.select(
+    "industry_id",
+    "naics_2022_6",
+    "naics_2022_6_name"
+).limit(5).toPandas()
+
+style_table(industries_preview)
+```
+
+### Preview Locations Table
+
+```{python}
+locations_preview = locations_df.select(
+    "location_id",
+    "city_name",
+    "state_name",
+    "county_name",
+    "msa",
+    "msa_name"
+).limit(5).toPandas()
+
+style_table(locations_preview)
+```
+
+### Preview Occupations Table
+
+```{python}
+occupations_preview = occupations_df.select(
+    "occupation_id",
+    "soc_5",
+    "soc_5_name",
+    "specialized_occupation",
+    "specialized_occupation_name",
+    "occupation_group",
+    "occupation_group_name"
+).limit(5).toPandas()
+
+style_table(occupations_preview)
+```
+
+### Preview Job Postings Table
+
+```{python}
+job_postings_preview = job_postings_df.select(
+    "id",
+    "title_clean",
+    "company_id",
+    "industry_id",
+    "occupation_id",
+    "location_id",
+    "salary",
+    "posted"
+).limit(5).toPandas()
+
+style_table(job_postings_preview)
+```
