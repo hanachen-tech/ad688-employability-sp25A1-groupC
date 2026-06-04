@@ -2,4 +2,11 @@
 **/*.quarto_ipynb
 lightcast_job_postings.csv
 
+projenv/data/
+.venv/
+__pycache__/
+.ipynb_checkpoints/
+*_files/
+data/
 projenv/
+_site/
