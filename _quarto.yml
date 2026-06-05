@@ -1,29 +1,29 @@
 project:
   type: website
-  render:
-    - "*.qmd"
-    - "**/*.qmd"
-    - "!projenv/"
 
 website:
-  title: "ad688-employability-sp25A1-groupC"
+  title: "Job Market Analysis 2024"
   navbar:
     left:
       - href: index.qmd
-        text: Home
-      - about.qmd
-      - href: research_introduction.qmd
-        text: Research Introduction
+        text: "Home"
+      - href: introduction.qmd
+        text: "Project Overview"
+      - href: data_cleaning.qmd
+        text: "Data Preparation"
+      - href: eda.qmd
+        text: "Exploratory Analysis"
+      - href: skill_gap_analysis.qmd
+        text: "Skill Gap Analysis"
+      - href: ml_methods.qmd
+        text: "Predictive Modeling"
       - href: career_plan.qmd
-        text: Career Plan
-
+        text: "Career Strategy"
 format:
   html:
-    theme:
-      - cosmo
-      - brand
-    css: styles.css
+    theme: cosmo
     toc: true
-
-
-
+execute:
+  echo: true
+  eval: true
+  code-fold: true
