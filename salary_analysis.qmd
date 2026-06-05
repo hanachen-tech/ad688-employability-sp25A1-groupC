@@ -1,0 +1,695 @@
+---
+title: "Salary & Compensation Trends"
+author: "Nutchanon Chaiyaratana"
+date: today
+format:
+  html:
+    theme: cerulean
+    toc: true
+    toc-depth: 2
+    embed-resources: true
+date-modified: today
+date-format: long
+execute:
+  echo: true
+  eval: true
+  freeze: false
+  warning: false
+  message: false
+---
+## Overview
+
+This section analyzes salary and compensation patterns in 2024 job postings using the Lightcast dataset. The goal is to understand how salaries vary across occupations, industries, locations, employment types, remote work arrangements, and AI-related skills.
+
+Because salary information is not available for every job posting, this analysis focuses on records with valid salary values greater than zero when comparing salary outcomes.
+
+## Step 1: Load Data and Create Relational Tables
+This section analyzes salary and compensation patterns in 2024 job postings using the Lightcast dataset. The goal is to understand how salaries vary across occupations, industries, locations, employment types, and remote work arrangements.
+
+Because salary information is not available for every job posting, this analysis focuses on records with valid salary values greater than zero.
+
+```{python}
+#| echo: true
+#| output: false
+#| warning: false
+#| message: false
+
+# load data + create tables here
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, monotonically_increasing_id
+
+spark = SparkSession.builder \
+    .config("spark.driver.host", "localhost") \
+    .appName("SalaryCompensationTrends") \
+    .getOrCreate()
+
+spark.catalog.clearCache()
+
+df = spark.read.option("header", "true") \
+    .option("inferSchema", "true") \
+    .option("multiLine", "true") \
+    .option("escape", "\"") \
+    .csv("data/lightcast_job_postings.csv")
+
+df.createOrReplaceTempView("raw_jobs")
+# Basic cleaning: remove records without a job posting ID
+
+df_clean = df.filter(col("ID").isNotNull())
+
+df_clean.createOrReplaceTempView("raw_jobs")
+
+print("Original rows:", df.count())
+
+print("Rows after removing missing ID:", df_clean.count())
+
+# companies table
+companies_df = df_clean.select(
+    col("COMPANY").alias("company_id"),
+    col("COMPANY").alias("company"),
+    col("COMPANY_NAME").alias("company_name"),
+    col("COMPANY_RAW").alias("company_raw"),
+    col("COMPANY_IS_STAFFING").alias("company_is_staffing")
+).dropDuplicates(["company_id"])
+
+companies_df.createOrReplaceTempView("companies")
+
+# industries table
+industries_df = df_clean.select(
+    col("NAICS_2022_6").alias("naics_2022_6"),
+    col("NAICS_2022_6_NAME").alias("naics_2022_6_name")
+).dropDuplicates()
+
+industries_df = industries_df.withColumn(
+    "industry_id",
+    monotonically_increasing_id()
+)
+
+industries_df = industries_df.select(
+    "industry_id",
+    "naics_2022_6",
+    "naics_2022_6_name"
+)
+
+industries_df.createOrReplaceTempView("industries")
+
+# locations table
+locations_df = df_clean.select(
+    col("LOCATION").alias("location"),
+    col("CITY_NAME").alias("city_name"),
+    col("STATE_NAME").alias("state_name"),
+    col("COUNTY_NAME").alias("county_name"),
+    col("MSA").alias("msa"),
+    col("MSA_NAME").alias("msa_name")
+).dropDuplicates()
+
+locations_df = locations_df.withColumn(
+    "location_id",
+    monotonically_increasing_id()
+)
+
+locations_df = locations_df.select(
+    "location_id",
+    "location",
+    "city_name",
+    "state_name",
+    "county_name",
+    "msa",
+    "msa_name"
+)
+
+locations_df.createOrReplaceTempView("locations")
+
+# occupations table
+occupations_df = df_clean.select(
+    col("SOC_5").alias("soc_5"),
+    col("SOC_5_NAME").alias("soc_5_name"),
+    col("LOT_SPECIALIZED_OCCUPATION").alias("specialized_occupation"),
+    col("LOT_SPECIALIZED_OCCUPATION_NAME").alias("specialized_occupation_name"),
+    col("LOT_OCCUPATION_GROUP").alias("occupation_group"),
+    col("LOT_OCCUPATION_GROUP_NAME").alias("occupation_group_name")
+).dropDuplicates()
+
+occupations_df = occupations_df.withColumn(
+    "occupation_id",
+    monotonically_increasing_id()
+)
+
+occupations_df = occupations_df.select(
+    "occupation_id",
+    "soc_5",
+    "soc_5_name",
+    "specialized_occupation",
+    "specialized_occupation_name",
+    "occupation_group",
+    "occupation_group_name"
+)
+
+occupations_df.createOrReplaceTempView("occupations")
+
+# job postings table
+job_with_industry = df_clean.join(
+    industries_df,
+    (
+        (df["NAICS_2022_6"] == industries_df["naics_2022_6"]) &
+        (df["NAICS_2022_6_NAME"] == industries_df["naics_2022_6_name"])
+    ),
+    "left"
+)
+
+job_with_location = job_with_industry.join(
+    locations_df,
+    (
+        (job_with_industry["LOCATION"] == locations_df["location"]) &
+        (job_with_industry["CITY_NAME"] == locations_df["city_name"]) &
+        (job_with_industry["STATE_NAME"] == locations_df["state_name"]) &
+        (job_with_industry["COUNTY_NAME"] == locations_df["county_name"]) &
+        (job_with_industry["MSA"] == locations_df["msa"]) &
+        (job_with_industry["MSA_NAME"] == locations_df["msa_name"])
+    ),
+    "left"
+)
+
+job_with_keys = job_with_location.join(
+    occupations_df,
+    (
+        (job_with_location["SOC_5"] == occupations_df["soc_5"]) &
+        (job_with_location["SOC_5_NAME"] == occupations_df["soc_5_name"]) &
+        (job_with_location["LOT_SPECIALIZED_OCCUPATION"] == occupations_df["specialized_occupation"]) &
+        (job_with_location["LOT_SPECIALIZED_OCCUPATION_NAME"] == occupations_df["specialized_occupation_name"]) &
+        (job_with_location["LOT_OCCUPATION_GROUP"] == occupations_df["occupation_group"]) &
+        (job_with_location["LOT_OCCUPATION_GROUP_NAME"] == occupations_df["occupation_group_name"])
+    ),
+    "left"
+)
+
+job_postings_df = job_with_keys.select(
+    job_with_keys["ID"].alias("id"),
+    job_with_keys["TITLE_CLEAN"].alias("title_clean"),
+    job_with_keys["COMPANY"].alias("company_id"),
+    col("industry_id"),
+    col("occupation_id"),
+    job_with_keys["EMPLOYMENT_TYPE_NAME"].alias("employment_type_name"),
+    job_with_keys["REMOTE_TYPE_NAME"].alias("remote_type_name"),
+    job_with_keys["BODY"].alias("body"),
+    job_with_keys["MIN_YEARS_EXPERIENCE"].alias("min_years_experience"),
+    job_with_keys["MAX_YEARS_EXPERIENCE"].alias("max_years_experience"),
+    job_with_keys["SALARY"].alias("salary"),
+    job_with_keys["SALARY_FROM"].alias("salary_from"),
+    job_with_keys["SALARY_TO"].alias("salary_to"),
+    col("location_id"),
+    job_with_keys["POSTED"].alias("posted"),
+    job_with_keys["EXPIRED"].alias("expired"),
+    job_with_keys["DURATION"].alias("duration")
+).filter(
+    col("id").isNotNull()
+).dropDuplicates(["id"])
+job_postings_df.createOrReplaceTempView("job_postings")
+```
+## Skill Table
+
+```{python}
+from pyspark.sql.functions import split, explode, trim, lit, monotonically_increasing_id, regexp_replace, col
+
+def create_skill_matches(column_name, skill_type):
+    return df_clean.select(
+        col("ID").alias("job_id"),
+        explode(split(col(column_name), ",")).alias("skill_name")
+    ).withColumn(
+        "skill_name",
+        regexp_replace(col("skill_name"), r'[\[\]"]', "")
+    ).withColumn(
+        "skill_name",
+        trim(col("skill_name"))
+    ).withColumn(
+        "skill_type",
+        lit(skill_type)
+    ).filter(
+        col("skill_name").isNotNull() & (col("skill_name") != "")
+    )
+
+specialized_skill_matches = create_skill_matches(
+    "SPECIALIZED_SKILLS_NAME",
+    "specialized"
+)
+
+common_skill_matches = create_skill_matches(
+    "COMMON_SKILLS_NAME",
+    "common"
+)
+
+software_skill_matches = create_skill_matches(
+    "SOFTWARE_SKILLS_NAME",
+    "software"
+)
+
+certification_matches = create_skill_matches(
+    "CERTIFICATIONS_NAME",
+    "certification"
+)
+
+job_skill_matches_raw = specialized_skill_matches.unionByName(
+    common_skill_matches
+).unionByName(
+    software_skill_matches
+).unionByName(
+    certification_matches
+).dropDuplicates(["job_id", "skill_name", "skill_type"])
+
+skills_df = job_skill_matches_raw.select(
+    "skill_name",
+    "skill_type"
+).dropDuplicates()
+
+skills_df = skills_df.withColumn(
+    "skill_id",
+    monotonically_increasing_id()
+)
+
+skills_df = skills_df.select(
+    "skill_id",
+    "skill_name",
+    "skill_type"
+)
+
+skills_df.createOrReplaceTempView("skills")
+
+job_skill_matches_df = job_skill_matches_raw.join(
+    skills_df,
+    on=["skill_name", "skill_type"],
+    how="left"
+).select(
+    "job_id",
+    "skill_id",
+    "skill_name",
+    "skill_type"
+)
+
+job_skill_matches_df.createOrReplaceTempView("job_skill_matches")
+```
+
+### Validate Registered SQL Tables
+Before running the salary analysis queries, I validate that all relational tables were created and registered in Spark SQL.
+
+```{python}
+
+def style_table(df, format_dict=None):
+
+    styled = df.style
+
+    if format_dict is not None:
+
+        styled = styled.format(format_dict)
+
+    styled = styled.set_properties(**{
+
+        "text-align": "left",
+
+        "white-space": "normal",
+
+        "border": "1px solid black"
+
+    }).set_table_styles([
+
+        {
+
+            "selector": "th",
+
+            "props": [
+
+                ("border", "1px solid black"),
+
+                ("text-align", "left"),
+
+                ("background-color", "#f2f2f2")
+
+            ]
+
+        },
+
+        {
+
+            "selector": "td",
+
+            "props": [
+
+                ("border", "1px solid black"),
+
+                ("padding", "6px")
+
+            ]
+
+        },
+
+        {
+
+            "selector": "table",
+
+            "props": [
+
+                ("border-collapse", "collapse")
+
+            ]
+
+        }
+
+    ])
+
+    return styled
+
+```
+```{python}
+table_counts = spark.sql("""
+SELECT 'job_postings' AS table_name, COUNT(*) AS row_count FROM job_postings
+UNION ALL
+SELECT 'companies' AS table_name, COUNT(*) AS row_count FROM companies
+UNION ALL
+SELECT 'industries' AS table_name, COUNT(*) AS row_count FROM industries
+UNION ALL
+SELECT 'locations' AS table_name, COUNT(*) AS row_count FROM locations
+UNION ALL
+SELECT 'occupations' AS table_name, COUNT(*) AS row_count FROM occupations
+UNION ALL
+SELECT 'skills' AS table_name, COUNT(*) AS row_count FROM skills
+UNION ALL
+SELECT 'job_skill_matches' AS table_name, COUNT(*) AS row_count FROM job_skill_matches
+""")
+
+table_counts_pd = table_counts.toPandas()
+
+style_table(table_counts_pd, {
+    "row_count": "{:,.0f}"
+})
+```
+
+### Preview Companies Table
+
+```{python}
+companies_preview = companies_df.select(
+    "company_id",
+    "company",
+    "company_name",
+    "company_raw",
+    "company_is_staffing"
+).limit(5).toPandas()
+
+style_table(companies_preview)
+```
+
+### Preview Industries Table
+
+```{python}
+industries_preview = industries_df.select(
+    "industry_id",
+    "naics_2022_6",
+    "naics_2022_6_name"
+).limit(5).toPandas()
+
+style_table(industries_preview)
+```
+
+### Preview Locations Table
+
+```{python}
+locations_preview = locations_df.select(
+    "location_id",
+    "city_name",
+    "state_name",
+    "county_name",
+    "msa",
+    "msa_name"
+).limit(5).toPandas()
+
+style_table(locations_preview)
+```
+
+### Preview Occupations Table
+
+```{python}
+occupations_preview = occupations_df.select(
+    "occupation_id",
+    "soc_5",
+    "soc_5_name",
+    "specialized_occupation",
+    "specialized_occupation_name",
+    "occupation_group",
+    "occupation_group_name"
+).limit(5).toPandas()
+
+style_table(occupations_preview)
+```
+
+### Preview Job Postings Table
+
+```{python}
+job_postings_preview = job_postings_df.select(
+    "id",
+    "title_clean",
+    "company_id",
+    "industry_id",
+    "occupation_id",
+    "location_id",
+    "salary",
+    "posted"
+).limit(5).toPandas()
+
+style_table(job_postings_preview)
+```
+
+### Preview Skills Table
+
+```{python}
+skills_preview = skills_df.select(
+    "skill_id",
+    "skill_name",
+    "skill_type"
+).limit(10).toPandas()
+
+style_table(skills_preview)
+```
+
+### Preview Job Skill Matches Table
+
+```{python}
+job_skill_matches_preview = job_skill_matches_df.select(
+    "job_id",
+    "skill_id",
+    "skill_name",
+    "skill_type"
+).limit(10).toPandas()
+
+style_table(job_skill_matches_preview)
+```
+
+## Salary & Compensation Trends
+### Explore Career Categories and Sample Job Titles
+
+Before classifying postings as AI-related or non-AI, I first review the career categories and sample job titles in the dataset.
+
+```{python}
+career_title_preview = spark.sql("""
+SELECT
+    o.specialized_occupation_name,
+    COUNT(j.id) AS job_count,
+    COUNT(DISTINCT j.title_clean) AS unique_job_titles,
+    CONCAT_WS(', ', SLICE(COLLECT_SET(j.title_clean), 1, 10)) AS sample_titles
+FROM job_postings j
+LEFT JOIN occupations o
+    ON j.occupation_id = o.occupation_id
+WHERE
+    o.specialized_occupation_name IS NOT NULL
+    AND j.title_clean IS NOT NULL
+GROUP BY
+    o.specialized_occupation_name
+ORDER BY
+    job_count DESC
+""")
+
+career_title_preview_pd = career_title_preview.toPandas()
+
+style_table(career_title_preview_pd, {
+    "job_count": "{:,.0f}",
+    "unique_job_titles": "{:,.0f}"
+})
+```
+
+## Explore AI-Related Skills
+
+Before classifying job postings as AI-related or non-AI, I first explore the skill names available in the Lightcast skills table. Since the exact Lightcast skill names are unknown, I review the most common skills and then search broadly for possible AI-related skill terms.
+
+### Top Skills in the Dataset
+
+```{python}
+top_skills = spark.sql("""
+SELECT
+    skill_name,
+    skill_type,
+    COUNT(DISTINCT job_id) AS job_count
+FROM job_skill_matches
+GROUP BY
+    skill_name,
+    skill_type
+ORDER BY
+    job_count DESC
+LIMIT 100
+""")
+
+top_skills_pd = top_skills.toPandas()
+
+style_table(top_skills_pd, {
+    "job_count": "{:,.0f}"
+})
+```
+
+### Possible AI-Related Skills
+
+```{python}
+possible_ai_skills = spark.sql("""
+SELECT
+    skill_name,
+    skill_type,
+    COUNT(DISTINCT job_id) AS job_count
+FROM job_skill_matches
+WHERE
+    LOWER(skill_name) LIKE '%machine%'
+    OR LOWER(skill_name) LIKE '%learning%'
+    OR LOWER(skill_name) LIKE '%artificial%'
+    OR LOWER(skill_name) LIKE '%intelligence%'
+    OR LOWER(skill_name) LIKE '%deep%'
+    OR LOWER(skill_name) LIKE '%neural%'
+    OR LOWER(skill_name) LIKE '%natural language%'
+    OR LOWER(skill_name) LIKE '%nlp%'
+    OR LOWER(skill_name) LIKE '%vision%'
+    OR LOWER(skill_name) LIKE '%generative%'
+    OR LOWER(skill_name) LIKE '%language model%'
+    OR LOWER(skill_name) LIKE '%llm%'
+    OR LOWER(skill_name) LIKE '%predictive%'
+    OR LOWER(skill_name) LIKE '%model%'
+    OR LOWER(skill_name) LIKE '%algorithm%'
+    OR LOWER(skill_name) LIKE '%data science%'
+GROUP BY
+    skill_name,
+    skill_type
+ORDER BY
+    job_count DESC
+LIMIT 100
+""")
+
+possible_ai_skills_pd = possible_ai_skills.toPandas()
+
+style_table(possible_ai_skills_pd, {
+    "job_count": "{:,.0f}"
+})
+```
+
+The table above is used as an exploratory step. It searches broadly for AI-related terms in Lightcast skill names. After reviewing these results, I use the confirmed AI-related skills to classify job postings into AI-related and non-AI groups.
+
+## Analysis 1: Salary Differences Between AI and Non-AI Careers
+
+This analysis classifies job postings as AI-related if they include AI or machine learning signals from either Lightcast skill tags, job titles, or job descriptions. Jobs without these AI-related signals are classified as non-AI. This combined method helps reduce missed AI-related postings that may not have AI skills tagged directly.
+
+```{python}
+ai_job_ids = spark.sql("""
+SELECT DISTINCT
+    j.id AS job_id
+FROM job_postings j
+LEFT JOIN job_skill_matches s
+    ON j.id = s.job_id
+WHERE
+    LOWER(s.skill_name) LIKE '%machine learning%'
+    OR LOWER(s.skill_name) LIKE '%artificial intelligence%'
+    OR LOWER(s.skill_name) LIKE '%generative artificial intelligence%'
+    OR LOWER(s.skill_name) LIKE '%mlops%'
+    OR LOWER(s.skill_name) LIKE '%natural language processing%'
+    OR LOWER(s.skill_name) LIKE '%deep learning%'
+    OR LOWER(s.skill_name) LIKE '%pytorch%'
+    OR LOWER(s.skill_name) LIKE '%artificial neural networks%'
+    OR LOWER(s.skill_name) LIKE '%machine learning model training%'
+    OR LOWER(s.skill_name) LIKE '%large language modeling%'
+    OR LOWER(s.skill_name) LIKE '%random forest algorithm%'
+    OR LOWER(s.skill_name) LIKE '%decision tree learning%'
+    OR LOWER(j.title_clean) LIKE '%machine learning%'
+    OR LOWER(j.title_clean) LIKE '%artificial intelligence%'
+    OR LOWER(j.title_clean) LIKE '%ai engineer%'
+    OR LOWER(j.title_clean) LIKE '%ml engineer%'
+    OR LOWER(j.title_clean) LIKE '%generative ai%'
+    OR LOWER(j.title_clean) LIKE '%llm%'
+    OR LOWER(j.body) LIKE '%machine learning%'
+    OR LOWER(j.body) LIKE '%artificial intelligence%'
+    OR LOWER(j.body) LIKE '%generative ai%'
+    OR LOWER(j.body) LIKE '%large language model%'
+    OR LOWER(j.body) LIKE '%llm%'
+    OR LOWER(j.body) LIKE '%deep learning%'
+    OR LOWER(j.body) LIKE '%natural language processing%'
+""")
+
+ai_job_ids.createOrReplaceTempView("ai_job_ids")
+```
+
+```{python}
+ai_vs_non_ai_salary = spark.sql("""
+SELECT
+    CASE
+        WHEN a.job_id IS NOT NULL THEN 'AI-related'
+        ELSE 'Non-AI'
+    END AS career_type,
+    ROUND(AVG(CAST(j.salary AS DOUBLE)), 2) AS avg_salary,
+    PERCENTILE_APPROX(CAST(j.salary AS DOUBLE), 0.5) AS median_salary,
+    COUNT(DISTINCT j.id) AS job_count,
+    COUNT(DISTINCT j.title_clean) AS unique_job_titles
+FROM job_postings j
+LEFT JOIN ai_job_ids a
+    ON j.id = a.job_id
+WHERE
+    j.salary IS NOT NULL
+    AND CAST(j.salary AS DOUBLE) > 0
+GROUP BY
+    CASE
+        WHEN a.job_id IS NOT NULL THEN 'AI-related'
+        ELSE 'Non-AI'
+    END
+ORDER BY
+    avg_salary DESC
+""")
+
+ai_vs_non_ai_salary_pd = ai_vs_non_ai_salary.toPandas()
+
+ai_vs_non_ai_salary_pd["job_share"] = (
+    ai_vs_non_ai_salary_pd["job_count"] / ai_vs_non_ai_salary_pd["job_count"].sum()
+)
+
+style_table(ai_vs_non_ai_salary_pd, {
+    "avg_salary": "${:,.2f}",
+    "median_salary": "${:,.2f}",
+    "job_count": "{:,.0f}",
+    "unique_job_titles": "{:,.0f}",
+    "job_share": "{:.1%}"
+})
+```
+
+```{python}
+#| label: fig-ai-vs-non-ai-salary
+#| fig-cap: "Average Salary: AI-Related vs. Non-AI Job Postings"
+#| fig-width: 7
+#| fig-height: 4
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots(figsize=(7, 4))
+
+sns.barplot(
+    data=ai_vs_non_ai_salary_pd,
+    x="career_type",
+    y="avg_salary",
+    ax=ax
+)
+
+ax.set_title("Average Salary: AI-Related vs. Non-AI Job Postings")
+ax.set_xlabel("Career Type")
+ax.set_ylabel("Average Salary")
+
+plt.tight_layout()
+plt.show()
+```
+
+AI-related postings are identified using both Lightcast skill tags and AI-related keywords in job titles and descriptions. This combined classification reduces the chance of missing AI-related jobs that are not tagged with AI skills directly. The comparison uses only postings with valid salary values.
