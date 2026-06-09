@@ -1,0 +1,276 @@
+---
+title: "Exploratory Analysis"
+format: html
+execute:
+  warning: false
+  message: false
+---
+
+# Exploratory Data Analysis
+
+```{python}
+#| echo: false
+#| warning: false
+#| message: false
+
+from pyspark.sql import SparkSession
+from IPython.display import display
+
+# Start Spark session
+spark = SparkSession.builder \
+    .config("spark.driver.host", "localhost") \
+    .appName("EDAJobMarket") \
+    .getOrCreate()
+
+spark.catalog.clearCache()
+
+# Load cleaned data created from data_cleaning.qmd
+df_clean = spark.read.parquet("data/cleaned/lightcast_cleaned.parquet")
+df_clean.createOrReplaceTempView("raw_jobs_clean")
+
+# Show basic cleaned dataset information
+print("Cleaned rows:", df_clean.count())
+print("Cleaned columns:", len(df_clean.columns))
+
+display(df_clean.limit(10).toPandas())
+
+# Basic EDA summary from cleaned data
+summary = spark.sql("""
+SELECT
+    COUNT(*) AS total_job_postings,
+    COUNT(DISTINCT ID) AS unique_job_ids,
+    COUNT(DISTINCT COMPANY_NAME) AS unique_companies,
+    COUNT(DISTINCT STATE_NAME) AS unique_states,
+    COUNT(DISTINCT NAICS_2022_6_NAME) AS unique_industries,
+    COUNT(DISTINCT LOT_SPECIALIZED_OCCUPATION_NAME) AS unique_occupations
+FROM raw_jobs_clean
+""")
+
+display(summary.toPandas())
+```
+
+## EDA Summary Tables
+
+```{python}
+#| echo: false
+#| warning: false
+#| message: false
+
+import plotly.express as px
+
+# Salary availability
+salary_availability = spark.sql("""
+SELECT
+    CASE
+        WHEN salary IS NOT NULL AND salary > 0 THEN 'Salary Available'
+        ELSE 'Salary Missing'
+    END AS salary_status,
+    COUNT(*) AS job_count
+FROM raw_jobs_clean
+GROUP BY
+    CASE
+        WHEN salary IS NOT NULL AND salary > 0 THEN 'Salary Available'
+        ELSE 'Salary Missing'
+    END
+ORDER BY job_count DESC
+""")
+
+# Remote type distribution
+remote_summary = spark.sql("""
+SELECT
+    CASE
+        WHEN remote_type_name IS NULL OR remote_type_name = '[None]' THEN 'Unknown'
+        ELSE remote_type_name
+    END AS remote_type,
+    COUNT(*) AS job_count
+FROM raw_jobs_clean
+GROUP BY
+    CASE
+        WHEN remote_type_name IS NULL OR remote_type_name = '[None]' THEN 'Unknown'
+        ELSE remote_type_name
+    END
+ORDER BY job_count DESC
+""")
+
+# Top states by job postings
+top_states = spark.sql("""
+SELECT
+    state_name,
+    COUNT(*) AS job_count
+FROM raw_jobs_clean
+WHERE state_name IS NOT NULL
+GROUP BY state_name
+ORDER BY job_count DESC
+LIMIT 10
+""")
+
+# Top industries by job postings
+top_industries = spark.sql("""
+SELECT
+    naics_2022_6_name AS industry,
+    COUNT(*) AS job_count
+FROM raw_jobs_clean
+WHERE naics_2022_6_name IS NOT NULL
+GROUP BY naics_2022_6_name
+ORDER BY job_count DESC
+LIMIT 10
+""")
+
+# Convert Spark results to pandas
+salary_availability_pd = salary_availability.toPandas()
+remote_summary_pd = remote_summary.toPandas()
+top_states_pd = top_states.toPandas()
+top_industries_pd = top_industries.toPandas()
+
+# ---------- Chart 1: Salary availability ----------
+
+fig_salary = px.bar(
+    salary_availability_pd,
+    x="salary_status",
+    y="job_count",
+    text="job_count",
+    color="salary_status",
+    color_discrete_map={
+        "Salary Missing": "#EF553B",
+        "Salary Available": "#00CC96"
+    },
+    title="Salary Availability in Job Postings",
+    labels={
+        "salary_status": "",
+        "job_count": "Number of Job Postings"
+    }
+)
+
+fig_salary.update_traces(
+    texttemplate="%{text:,.0f}",
+    textposition="outside",
+    marker_line_width=0
+)
+
+fig_salary.update_layout(
+    template="plotly_white",
+    height=380,
+    margin=dict(l=50, r=40, t=70, b=50),
+    title=dict(x=0.02, xanchor="left"),
+    showlegend=False,
+    font=dict(size=12),
+    yaxis=dict(gridcolor="rgba(0,0,0,0.08)")
+)
+
+fig_salary.show()
+
+# ---------- Chart 2: Remote type distribution ----------
+
+fig_remote = px.bar(
+    remote_summary_pd,
+    x="remote_type",
+    y="job_count",
+    text="job_count",
+    color="remote_type",
+    color_discrete_map={
+        "Unknown": "#636EFA",
+        "Remote": "#00CC96",
+        "Hybrid Remote": "#AB63FA",
+        "Not Remote": "#FFA15A"
+    },
+    title="Remote Type Distribution",
+    labels={
+        "remote_type": "",
+        "job_count": "Number of Job Postings"
+    }
+)
+
+fig_remote.update_traces(
+    texttemplate="%{text:,.0f}",
+    textposition="outside",
+    marker_line_width=0
+)
+
+fig_remote.update_layout(
+    template="plotly_white",
+    height=380,
+    margin=dict(l=50, r=40, t=70, b=50),
+    title=dict(x=0.02, xanchor="left"),
+    showlegend=False,
+    font=dict(size=12),
+    yaxis=dict(gridcolor="rgba(0,0,0,0.08)")
+)
+
+fig_remote.show()
+
+# ---------- Chart 3: Top 10 states by job postings ----------
+
+top_states_plot = top_states_pd.sort_values("job_count", ascending=True)
+
+fig_states = px.bar(
+    top_states_plot,
+    x="job_count",
+    y="state_name",
+    text="job_count",
+    color="state_name",
+    orientation="h",
+    title="Top 10 States by Job Postings",
+    labels={
+        "state_name": "",
+        "job_count": "Number of Job Postings"
+    },
+    color_discrete_sequence=px.colors.qualitative.Set3
+)
+
+fig_states.update_traces(
+    texttemplate="%{text:,.0f}",
+    textposition="outside",
+    marker_line_width=0
+)
+
+fig_states.update_layout(
+    template="plotly_white",
+    height=480,
+    margin=dict(l=100, r=60, t=70, b=50),
+    title=dict(x=0.02, xanchor="left"),
+    showlegend=False,
+    font=dict(size=12),
+    xaxis=dict(gridcolor="rgba(0,0,0,0.08)")
+)
+
+fig_states.show()
+
+# ---------- Chart 4: Top 10 industries by job postings ----------
+
+top_industries_plot = top_industries_pd.sort_values("job_count", ascending=True)
+
+fig_industries = px.bar(
+    top_industries_plot,
+    x="job_count",
+    y="industry",
+    text="job_count",
+    color="industry",
+    orientation="h",
+    title="Top 10 Industries by Job Postings",
+    labels={
+        "industry": "",
+        "job_count": "Number of Job Postings"
+    },
+    color_discrete_sequence=px.colors.qualitative.Pastel
+)
+
+fig_industries.update_traces(
+    texttemplate="%{text:,.0f}",
+    textposition="outside",
+    marker_line_width=0
+)
+
+fig_industries.update_layout(
+    template="plotly_white",
+    height=560,
+    margin=dict(l=260, r=60, t=70, b=50),
+    title=dict(x=0.02, xanchor="left"),
+    showlegend=False,
+    font=dict(size=12),
+    xaxis=dict(gridcolor="rgba(0,0,0,0.08)")
+)
+
+fig_industries.show()
+```
+### EDA Summary Findings
+The exploratory analysis shows that the cleaned dataset contains a large number of job postings, but salary availability is limited. Out of 72,476 cleaned postings, 41,668 postings are missing salary information, while 30,808 postings include valid salary values. This means salary-related analysis should rely only on the valid salary subset, while non-salary analysis can still use the full dataset. The remote-work distribution also shows that most postings have an unknown remote classification, so remote-work comparisons should be interpreted carefully. The geographic distribution shows that Texas and California have the highest job posting counts, suggesting strong job-market activity in large and economically diverse states. The industry distribution is led by Unclassified Industry, followed by computer programming, management consulting, employment placement, and computer systems design services. Because the unclassified industry category is large, final industry-specific analysis should either treat it as a separate data-quality category or filter it out when comparing clearly defined industries.

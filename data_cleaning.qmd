@@ -1,0 +1,181 @@
+---
+title: "Data Preparation"
+format: html
+execute:
+  warning: false
+  message: false
+---
+
+# Data Preparation
+
+This section prepares the Lightcast job posting dataset before analysis. The cleaning process includes checking missing values, identifying duplicate job posting IDs, reviewing suspicious salary and date values, cleaning important fields, and saving a cleaned dataset for later EDA and analysis.
+
+## Load Raw Data
+
+```{python}
+#| echo: true
+#| warning: false
+#| message: false
+
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, trim, to_date, isnan, sum as spark_sum, when
+from IPython.display import display
+import os
+
+# Start Spark session
+spark = SparkSession.builder \
+    .config("spark.driver.host", "localhost") \
+    .appName("SalaryCompensationTrends") \
+    .getOrCreate()
+
+spark.catalog.clearCache()
+
+# Load raw Lightcast data
+df = spark.read.option("header", "true") \
+    .option("inferSchema", "true") \
+    .option("multiLine", "true") \
+    .option("escape", "\"") \
+    .csv("data/lightcast_job_postings.csv")
+
+df.createOrReplaceTempView("raw_jobs")
+
+print("Original rows:", df.count())
+print("Original columns:", len(df.columns))
+
+
+# --------------------------------------------------
+# 1. Check missing values
+# --------------------------------------------------
+
+total_rows = df.count()
+
+null_counts = df.select([
+    spark_sum(when(col(c).isNull(), 1).otherwise(0)).alias(c)
+    for c in df.columns
+]).toPandas().T.reset_index()
+
+null_counts.columns = ["column_name", "null_count"]
+null_counts["null_percent"] = (null_counts["null_count"] / total_rows * 100).round(2)
+
+display(null_counts.sort_values("null_count", ascending=False))
+
+
+# --------------------------------------------------
+# 2. Check duplicate primary key
+# --------------------------------------------------
+
+duplicate_ids = df.groupBy("ID").count().filter(col("count") > 1)
+
+print("Duplicate job ID groups:", duplicate_ids.count())
+
+display(duplicate_ids.limit(20).toPandas())
+
+
+# --------------------------------------------------
+# 3. Remove missing and duplicate IDs
+# --------------------------------------------------
+
+df_clean_base = df.filter(col("ID").isNotNull())
+df_clean_base = df_clean_base.dropDuplicates(["ID"])
+
+print("Rows after removing missing and duplicate IDs:", df_clean_base.count())
+
+
+# --------------------------------------------------
+# 4. Check suspicious salary and date values
+# --------------------------------------------------
+
+df_check = df_clean_base.withColumn("SALARY", col("SALARY").cast("double")) \
+                        .withColumn("SALARY_FROM", col("SALARY_FROM").cast("double")) \
+                        .withColumn("SALARY_TO", col("SALARY_TO").cast("double"))
+
+# Note: salaries above 500,000 are flagged as unusually high, not automatically impossible.
+suspicious_values = df_check.filter(
+    (col("SALARY").isNotNull() & isnan(col("SALARY")))
+    | (col("SALARY") <= 0)
+    | (col("SALARY") > 500000)
+    | (col("SALARY_FROM") < 0)
+    | (col("SALARY_TO") < 0)
+    | (col("SALARY_FROM") > col("SALARY_TO"))
+    | to_date(col("POSTED"), "M/d/yyyy").isNull()
+)
+
+print("Suspicious rows after removing missing IDs:", suspicious_values.count())
+
+display(
+    suspicious_values.select(
+        "ID",
+        "TITLE_CLEAN",
+        "COMPANY_NAME",
+        "SALARY",
+        "SALARY_FROM",
+        "SALARY_TO",
+        "POSTED",
+        "CITY_NAME",
+        "STATE_NAME",
+        "REMOTE_TYPE_NAME"
+    ).limit(20).toPandas()
+)
+import pandas as pd
+
+checks_pd = pd.DataFrame([
+    {"check": "Salary is NaN", "count": df_check.filter(col("SALARY").isNotNull() & isnan(col("SALARY"))).count()},
+    {"check": "Salary <= 0", "count": df_check.filter(col("SALARY") <= 0).count()},
+    {"check": "Salary > 500,000", "count": df_check.filter(col("SALARY") > 500000).count()},
+    {"check": "Salary From < 0", "count": df_check.filter(col("SALARY_FROM") < 0).count()},
+    {"check": "Salary To < 0", "count": df_check.filter(col("SALARY_TO") < 0).count()},
+    {"check": "Salary From > Salary To", "count": df_check.filter(col("SALARY_FROM") > col("SALARY_TO")).count()},
+    {"check": "Unparseable posted date", "count": df_check.filter(to_date(col("POSTED"), "M/d/yyyy").isNull()).count()}
+])
+
+display(checks_pd)
+
+missing_salary = df_check.filter(col("SALARY").isNull()).count()
+
+print("Rows with missing salary:", missing_salary)
+
+# --------------------------------------------------
+# 5. Clean data
+# --------------------------------------------------
+
+df_clean = df_clean_base
+
+# Trim important text fields
+df_clean = df_clean.withColumn("TITLE_CLEAN", trim(col("TITLE_CLEAN")))
+df_clean = df_clean.withColumn("COMPANY_NAME", trim(col("COMPANY_NAME")))
+df_clean = df_clean.withColumn("CITY_NAME", trim(col("CITY_NAME")))
+df_clean = df_clean.withColumn("STATE_NAME", trim(col("STATE_NAME")))
+df_clean = df_clean.withColumn("REMOTE_TYPE_NAME", trim(col("REMOTE_TYPE_NAME")))
+
+# Convert salary columns to numeric format
+df_clean = df_clean.withColumn("SALARY", col("SALARY").cast("double"))
+df_clean = df_clean.withColumn("SALARY_FROM", col("SALARY_FROM").cast("double"))
+df_clean = df_clean.withColumn("SALARY_TO", col("SALARY_TO").cast("double"))
+
+# Convert posted date to date format
+df_clean = df_clean.withColumn("POSTED_DATE", to_date(col("POSTED"), "M/d/yyyy"))
+
+df_clean.createOrReplaceTempView("raw_jobs_clean")
+
+print("Rows after cleaning:", df_clean.count())
+print("Columns after cleaning:", len(df_clean.columns))
+
+
+# --------------------------------------------------
+# 6. Save cleaned data
+# --------------------------------------------------
+
+os.makedirs("data/cleaned", exist_ok=True)
+
+df_clean.write.mode("overwrite").parquet("data/cleaned/lightcast_cleaned.parquet")
+
+print("Saved cleaned data to: data/cleaned/lightcast_cleaned.parquet")
+```
+
+## Cleaning Findings
+
+The main data quality issue found in the raw dataset was missing job posting IDs. The dataset originally contained 72,498 rows, and 22 rows had missing IDs. Since the job posting ID is required as the primary identifier for each job posting, these 22 rows were removed. After removing missing and duplicate IDs, the cleaned dataset contained 72,476 rows.
+
+After removing the rows with missing IDs, I checked for suspicious salary and date values. No impossible salary values were found based on the selected checks, including zero or negative salaries, salaries above $500,000, negative salary ranges, cases where salary_from was greater than salary_to, or unparseable posting dates.
+
+However, 41,668 records had missing salary values. These records were kept in the cleaned dataset because missing salary does not make a job posting invalid. These postings can still be used for non-salary analysis, such as company counts, location trends, remote-work analysis, industry analysis, and skill analysis. For salary-related analysis, I will apply salary-specific filters and use only records with valid salary values.
