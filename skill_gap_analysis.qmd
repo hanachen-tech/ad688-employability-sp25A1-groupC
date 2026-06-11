@@ -64,13 +64,20 @@ print(df_skills_indexed)
 print("\nTeam Average Skills:")
 print(df_skills_indexed.mean())
 ```
+The self-assessment reveals several patterns across the team:
+
+- **Statistical Analysis** is the team's relative strength, with an average score of **2.75**, reflecting shared exposure through academic coursework.
+- **SQL** follows closely at **2.50**, suggesting moderate but uneven proficiency — useful for basic queries, but likely insufficient for complex analytical workflows.
+- **Git/GitHub** stands out as the most uniformly weak skill, with every member rating themselves at **1 or 2**. This is a critical gap given that version control is foundational to any collaborative data project.
+- **Machine Learning** and **Cloud Computing** are also low across the board, with three out of four members rating themselves at **1** — indicating limited hands-on experience beyond introductory exposure.
+
+---
 
 ## Part 2: Skill Visualization
 
 ### Team Skills Heatmap
 
-The heatmap below visualizes the skill levels of each team member. 
-Darker colors represent higher proficiency levels.
+The heatmap below provides a visual overview of individual skill levels across the team. Green cells indicate higher proficiency; red cells indicate areas needing development.
 
 ### Creating the Heatmap
 
@@ -98,6 +105,10 @@ plt.show()
 
 print("Heatmap saved successfully!")
 ```
+**Reading the heatmap:** The dominance of yellow and red across most cells confirms that the team is largely at a beginner-to-intermediate level. No single member has a clear advanced skill in any category, and the bottom two rows (Nutchanon and Tsyr Rau) show a notably red profile — indicating the widest individual gaps relative to market expectations.
+
+---
+
 
 ## Part 3: Market-Demanded Skills
 
@@ -154,6 +165,16 @@ for i, bar in enumerate(bars):
 plt.tight_layout()
 plt.show()
 ```
+### Key Observations
+
+The market data tells a clear story: **Python and SQL are non-negotiable baselines** for data roles, appearing in 95% and 88% of postings respectively. Together, they form the minimum entry bar for most positions.
+
+**Machine Learning (75%)** ranks third — higher than many candidates might expect — reflecting the growing expectation that even non-specialist data analysts should be familiar with ML concepts and tools. **Cloud Computing (65%)** has surged in demand as enterprise workflows migrate to AWS, Azure, and GCP.
+
+Notably, **R (45%)**, though still valued in academic and research contexts, ranks last among the seven skills — suggesting that for industry roles, Python-first fluency is far more marketable.
+
+---
+
 
 ## Part 4: Skill Gap Analysis
 
@@ -217,6 +238,26 @@ for bars in [bars1, bars2]:
 plt.tight_layout()
 plt.show()
 ```
+### Findings
+
+The gap analysis highlights three tiers of urgency:
+
+**🔴 High Priority (Gap > 1.5)**
+
+- **Python** — Team average of 2.5 vs. market demand of 4.75. This is the single most critical gap. Python is required in nearly every data role, and the team's current level is insufficient for professional-level work.
+- **Machine Learning** — Team average of 1.75 vs. market demand of 3.75. Most team members have minimal hands-on experience, yet ML fluency is increasingly expected even in analyst-level roles.
+- **Cloud Computing** — Team average of 1.5 vs. market demand of 3.25. While less universally required, cloud proficiency is becoming a table-stakes expectation in enterprise environments.
+
+**🟡 Medium Priority (Gap 0.5–1.5)**
+
+- **Git/GitHub** — The gap is moderate numerically, but the skill's foundational nature makes it practically more urgent. Collaborative work in any technical role depends on version control.
+- **R** — A smaller gap, but largely because market demand for R is also lower relative to Python.
+
+**🟢 Low Priority (Gap < 0.5)**
+
+- **Statistical Analysis** and **SQL** — The team performs relatively close to market expectations. These are areas to maintain and deepen rather than urgently build from scratch.
+
+---
 
 ## Part 5: Improvement Plan
 
@@ -294,3 +335,20 @@ for skill in high_priority.index:
         for resource in resources[skill]:
             print(f"  • {resource}")
 ```
+---
+
+## Summary
+
+This skill gap analysis reveals a team that is building a solid foundation but has significant room to grow in areas the market increasingly considers baseline competencies.
+
+| Skill | Team Avg | Market (1–5) | Gap | Priority |
+|-------|----------|--------------|-----|----------|
+| Python | 2.5 | 4.75 | 2.25 | 🔴 High |
+| Machine Learning | 1.75 | 3.75 | 2.00 | 🔴 High |
+| Cloud Computing | 1.50 | 3.25 | 1.75 | 🔴 High |
+| Git/GitHub | 1.25 | 2.60 | 1.35 | 🟡 Medium |
+| R | 1.75 | 2.25 | 0.50 | 🟡 Medium |
+| Statistical Analysis | 2.75 | 3.00 | 0.25 | 🟢 Low |
+| SQL | 2.50 | 4.40 | 1.90 | 🔴 High |
+
+The most actionable takeaway: **Python and SQL should be the immediate focus for all team members**, as they represent both the highest market demand and among the largest gaps. Complementing these with Git/GitHub fluency would quickly make any team member job-ready for entry-level data roles. Machine Learning and Cloud Computing can follow as intermediate-term goals once foundational scripting skills are solidified.
