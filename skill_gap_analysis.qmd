@@ -82,29 +82,34 @@ The heatmap below provides a visual overview of individual skill levels across t
 ### Creating the Heatmap
 
 ```{python}
-# Create a nice heatmap
-plt.figure(figsize=(12, 6))
-sns.heatmap(
-    df_skills_indexed, 
-    annot=True,          # number
-    cmap="RdYlGn",       # color
-    cbar_kws={'label': 'Skill Level (1-5)'},
-    linewidths=0.5,
-    linecolor='gray',
-    fmt='d',              # format
-    vmin=0,
-    vmax=5
+import plotly.graph_objects as go
+import plotly.express as px
+
+# Create interactive Plotly heatmap
+fig_heatmap = go.Figure(data=go.Heatmap(
+    z=df_skills_indexed.values,
+    x=df_skills_indexed.columns,
+    y=df_skills_indexed.index,
+    colorscale='RdYlGn',
+    text=df_skills_indexed.values,
+    texttemplate='%{text}',
+    textfont={"size": 12},
+    hovertemplate='<b>%{y}</b><br>%{x}: %{z}<extra></extra>',
+    colorbar=dict(title="Skill Level (1-5)")
+))
+
+fig_heatmap.update_layout(
+    title="Team Skills Assessment Heatmap (Interactive)",
+    xaxis_title="Skills",
+    yaxis_title="Team Members",
+    height=500,
+    width=1000,
+    hovermode='closest'
 )
 
-plt.title("Team Skills Assessment Heatmap", fontsize=16, fontweight='bold', pad=20)
-plt.xlabel("Skills", fontsize=12)
-plt.ylabel("Team Members", fontsize=12)
-plt.xticks(rotation=45, ha='right')
-plt.tight_layout()
-plt.show()
-
-print("Heatmap saved successfully!")
+fig_heatmap.show()
 ```
+
 **Reading the heatmap:** The dominance of yellow and red across most cells confirms that the team is largely at a beginner-to-intermediate level. No single member has a clear advanced skill in any category, and the bottom two rows (Nutchanon and Tsyr Rau) show a notably red profile — indicating the widest individual gaps relative to market expectations.
 
 ---
@@ -120,6 +125,9 @@ the most frequently required skills in data science and IT roles.
 ### Analyzing Job Postings
 
 ```{python}
+import plotly.graph_objects as go
+import plotly.express as px
+
 # Based on analysis of job postings, here are the top required skills
 # and their frequency in job postings
 
@@ -146,25 +154,57 @@ print(df_market)
 ### Visualization of Market Demands
 
 ```{python}
-# Create bar chart of market demands
-fig, ax = plt.subplots(figsize=(12, 6))
+# Job skill frequency based on market analysis
+job_skill_frequency = {
+    "Python": 95,
+    "SQL": 88,
+    "Machine Learning": 75,
+    "Data Visualization": 68,
+    "Cloud Computing": 65,
+    "Statistical Analysis": 60,
+    "Excel": 58,
+    "Git/GitHub": 52,
+    "R": 45,
+    "Deep Learning": 35
+}
 
-colors = plt.cm.Blues(np.linspace(0.4, 0.8, len(df_market)))
-bars = ax.barh(df_market['Skill'], df_market['Job Posting Frequency (%)'], color=colors)
+# Convert to DataFrame
+df_market = pd.DataFrame(
+    list(job_skill_frequency.items()),
+    columns=['Skill', 'Job Posting Frequency (%)']
+).sort_values('Job Posting Frequency (%)', ascending=True)
 
-ax.set_xlabel('Frequency in Job Postings (%)', fontsize=12)
-ax.set_title('Top In-Demand Skills in 2024 Job Market', fontsize=14, fontweight='bold')
-ax.set_xlim(0, 100)
+# Create interactive bar chart
+fig_market = go.Figure(data=[
+    go.Bar(
+        y=df_market['Skill'],
+        x=df_market['Job Posting Frequency (%)'],
+        orientation='h',
+        marker=dict(
+            color=df_market['Job Posting Frequency (%)'],
+            colorscale='Blues',
+            showscale=True,
+            colorbar=dict(title="Frequency (%)")
+        ),
+        text=df_market['Job Posting Frequency (%)'],
+        textposition='auto',
+        hovertemplate='<b>%{y}</b><br>Frequency: %{x}%<extra></extra>'
+    )
+])
 
-# Add value labels on bars
-for i, bar in enumerate(bars):
-    width = bar.get_width()
-    ax.text(width + 1, bar.get_y() + bar.get_height()/2, 
-            f'{width:.0f}%', ha='left', va='center', fontsize=10)
+fig_market.update_layout(
+    title="Top In-Demand Skills in 2024 Job Market (Interactive)",
+    xaxis_title="Frequency in Job Postings (%)",
+    yaxis_title="Skills",
+    height=600,
+    width=1000,
+    showlegend=False,
+    hovermode='closest'
+)
 
-plt.tight_layout()
-plt.show()
+fig_market.show()
 ```
+
 ### Key Observations
 
 The market data tells a clear story: **Python and SQL are non-negotiable baselines** for data roles, appearing in 95% and 88% of postings respectively. Together, they form the minimum entry bar for most positions.
@@ -184,6 +224,9 @@ We compare our team's average skill level against market demands
 to identify where we need to improve.
 
 ```{python}
+import plotly.graph_objects as go
+import plotly.express as px
+
 # Calculate team average for each skill
 team_avg_skills = df_skills_indexed.mean().sort_values(ascending=False)
 
@@ -209,35 +252,58 @@ print(comparison_df.sort_values('Gap', ascending=False))
 ### Visualizing Skill Gaps
 
 ```{python}
-# Create comparison visualization
-fig, ax = plt.subplots(figsize=(12, 8))
+# Calculate team average for each skill
+team_avg_skills = df_skills_indexed.mean().sort_values(ascending=False)
 
-x = np.arange(len(comparison_df))
-width = 0.35
+# Create comparison DataFrame
+comparison_df = pd.DataFrame({
+    'Team Average': team_avg_skills,
+    'Market Demand': [job_skill_frequency.get(skill, 0) for skill in team_avg_skills.index]
+})
 
-bars1 = ax.bar(x - width/2, comparison_df['Team Average'], width, 
-               label='Team Average', color='skyblue', alpha=0.8)
-bars2 = ax.bar(x + width/2, comparison_df['Market Demand (1-5)'], width, 
-               label='Market Demand', color='coral', alpha=0.8)
+# Normalize market demand to 1-5 scale
+comparison_df['Market Demand (1-5)'] = (comparison_df['Market Demand'] / 100) * 5
+comparison_df['Gap'] = comparison_df['Market Demand (1-5)'] - comparison_df['Team Average']
+comparison_df['Gap Category'] = comparison_df['Gap'].apply(
+    lambda x: 'High Priority' if x > 1.5 else ('Medium Priority' if x > 0.5 else 'Low Priority')
+)
 
-ax.set_xlabel('Skills', fontsize=12)
-ax.set_ylabel('Level (1-5)', fontsize=12)
-ax.set_title('Team Skills vs Market Demands', fontsize=14, fontweight='bold')
-ax.set_xticks(x)
-ax.set_xticklabels(comparison_df.index, rotation=45, ha='right')
-ax.legend(fontsize=11)
-ax.set_ylim(0, 5)
+# Create interactive grouped bar chart
+fig_comparison = go.Figure(data=[
+    go.Bar(
+        name='Team Average',
+        x=comparison_df.index,
+        y=comparison_df['Team Average'],
+        marker=dict(color='skyblue'),
+        hovertemplate='<b>%{x}</b><br>Team: %{y:.1f}<extra></extra>'
+    ),
+    go.Bar(
+        name='Market Demand (1-5)',
+        x=comparison_df.index,
+        y=comparison_df['Market Demand (1-5)'],
+        marker=dict(color='coral'),
+        hovertemplate='<b>%{x}</b><br>Market: %{y:.1f}<extra></extra>'
+    )
+])
 
-# Add value labels
-for bars in [bars1, bars2]:
-    for bar in bars:
-        height = bar.get_height()
-        ax.text(bar.get_x() + bar.get_width()/2., height,
-                f'{height:.1f}', ha='center', va='bottom', fontsize=9)
+fig_comparison.update_layout(
+    title="Team Skills vs Market Demands (Interactive)",
+    xaxis_title="Skills",
+    yaxis_title="Level (1-5)",
+    barmode='group',
+    height=500,
+    width=1200,
+    hovermode='x unified',
+    legend=dict(
+        x=0.01,
+        y=0.99,
+        bgcolor='rgba(255, 255, 255, 0.8)'
+    )
+)
 
-plt.tight_layout()
-plt.show()
+fig_comparison.show()
 ```
+
 ### Findings
 
 The gap analysis highlights three tiers of urgency:
@@ -266,28 +332,59 @@ The gap analysis highlights three tiers of urgency:
 Based on the gap analysis, the following skills should be prioritized:
 
 ```{python}
+import plotly.graph_objects as go
+import plotly.express as px
+
 # Filter high priority skills
-high_priority = comparison_df[comparison_df['Gap Category'] == 'High Priority'].sort_values('Gap', ascending=False)
+high_priority = comparison_df[comparison_df['Gap Category'] == 'High Priority'].sort_values('Gap', ascending=True)
 
-print("High Priority Skills to Learn:")
-print("=" * 60)
+if len(high_priority) > 0:
+    # Create interactive chart for high priority skills
+    fig_priority = go.Figure(data=[
+        go.Bar(
+            y=high_priority.index,
+            x=high_priority['Gap'],
+            orientation='h',
+            marker=dict(
+                color=high_priority['Gap'],
+                colorscale='Reds',
+                showscale=True,
+                colorbar=dict(title="Gap Size")
+            ),
+            text=high_priority['Gap'].round(1),
+            textposition='auto',
+            hovertemplate='<b>%{y}</b><br>Gap: %{x:.1f} levels<extra></extra>'
+        )
+    ])
 
-# Simply print the dataframe
-for skill in high_priority.index:
-    gap = high_priority.loc[skill, 'Gap']
-    avg = high_priority.loc[skill, 'Team Average']
-    demand = high_priority.loc[skill, 'Market Demand (1-5)']
-    print(f"\n{skill}:")
-    print(f"  Team Average: {avg:.1f}")
-    print(f"  Market Demand: {demand:.1f}")
-    print(f"  Gap: {gap:.1f}")
+    fig_priority.update_layout(
+        title="High Priority Skills to Learn (Gap Size)",
+        xaxis_title="Skill Gap (levels)",
+        yaxis_title="Skills",
+        height=400,
+        width=800,
+        showlegend=False,
+        hovermode='closest'
+    )
+
+    fig_priority.show()
+    
+    print("\nHigh Priority Skills:")
+    for skill in high_priority.index:
+        gap = high_priority.loc[skill, 'Gap']
+        print(f"  • {skill}: Gap = {gap:.1f} levels")
+else:
+    print("No high priority skills identified - Excellent work!")
 ```
 
 ### Personalized Recommendations by Team Member
 
 ```{python}
-# For each team member, identify their weakest skills compared to market
-recommendations = {}
+import plotly.graph_objects as go
+import plotly.express as px
+
+# Create interactive table showing recommendations
+recommendations_data = []
 
 for member in df_skills_indexed.index:
     member_skills = df_skills_indexed.loc[member]
@@ -297,18 +394,41 @@ for member in df_skills_indexed.index:
     gaps = market_demand - member_skills
     priority_skills = gaps[gaps > 1.5].sort_values(ascending=False)
     
-    recommendations[member] = priority_skills.index.tolist()[:3]  # Top 3 skills
+    top_skills = ', '.join(priority_skills.index[:3]) if len(priority_skills) > 0 else "None"
+    
+    recommendations_data.append({
+        'Team Member': member,
+        'Priority Skills': top_skills,
+        'Number of High-Priority Skills': len(priority_skills)
+    })
 
-print("Personalized Skill Development Priorities:")
-print("=" * 60)
-for member, skills in recommendations.items():
-    print(f"\n{member}:")
-    if skills:
-        for i, skill in enumerate(skills, 1):
-            gap = comparison_df.loc[skill, 'Gap']
-            print(f"  {i}. {skill} (Gap: {gap:.1f} levels)")
-    else:
-        print("  No high-priority gaps identified")
+recommendations_df = pd.DataFrame(recommendations_data)
+
+# Create interactive table visualization
+fig_table = go.Figure(data=[go.Table(
+    header=dict(
+        values=list(recommendations_df.columns),
+        fill_color='paleturquoise',
+        align='left',
+        font=dict(color='black', size=12)
+    ),
+    cells=dict(
+        values=[recommendations_df[col] for col in recommendations_df.columns],
+        fill_color='lavender',
+        align='left',
+        font=dict(color='black', size=11)
+    )
+)])
+
+fig_table.update_layout(
+    title="Personalized Skill Development Recommendations",
+    height=300,
+    width=900
+)
+
+fig_table.show()
+
+print(recommendations_df.to_string(index=False))
 ```
 
 ### Recommended Learning Resources
