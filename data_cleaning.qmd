@@ -1,6 +1,15 @@
 ---
 title: "Data Preparation"
-format: html
+author: "Nutchanon Chaiyaratana"
+date: today
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 2
+    code-fold: true
+    code-summary: "Show code"
+    embed-resources: true
 execute:
   warning: false
   message: false
@@ -8,19 +17,65 @@ execute:
 
 # Data Preparation
 
-This section prepares the Lightcast job posting dataset before analysis. The cleaning process includes checking missing values, identifying duplicate job posting IDs, reviewing suspicious salary and date values, cleaning important fields, and saving a cleaned dataset for later EDA and analysis.
+## Overview
 
-## Load Raw Data
+This page documents the data preparation process used to clean the raw Lightcast job postings dataset. The goal is to create a consistent cleaned dataset for exploratory analysis, salary analysis, regression, classification, and clustering.
+
+The cleaning process includes checking missing values, identifying duplicate job posting IDs, reviewing suspicious salary and date values, cleaning important text and category fields, creating an analysis-ready salary variable, and saving the cleaned dataset for later pages.
+
+Raw file: `data/lightcast_job_postings.csv`  
+Output file: `data/cleaned/lightcast_cleaned.parquet`
+
+## 1. Load the Raw Data
+
+The raw Lightcast dataset contains job posting information such as job titles, companies, locations, industries, occupations, remote-work status, skills, and salary fields. I load the dataset using Spark because the file is large and the later analysis pages also rely on Spark SQL.
 
 ```{python}
 #| echo: true
-#| warning: false
-#| message: false
 
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, trim, to_date, isnan, sum as spark_sum, when
-from IPython.display import display
+from pyspark.sql.functions import (
+    col,
+    count,
+    round, 
+    percentile_approx,
+    trim,
+    when,
+    isnan,
+    to_date,
+    regexp_replace,
+    sum as spark_sum
+)
 import os
+import pandas as pd
+
+def style_table(df, format_dict=None):
+    styled = df.style
+    if format_dict is not None:
+        styled = styled.format(format_dict)
+    styled = styled.set_properties(**{
+        "text-align": "left",
+        "white-space": "normal",
+        "border": "1px solid #ddd",
+        "padding": "6px"
+    }).set_table_styles([
+        {"selector": "th", "props": [
+            ("background-color", "#f6f8fa"),
+            ("color", "#24324b"),
+            ("font-weight", "bold"),
+            ("border", "1px solid #ddd"),
+            ("padding", "8px")
+        ]},
+        {"selector": "td", "props": [
+            ("border", "1px solid #ddd"),
+            ("padding", "6px")
+        ]},
+        {"selector": "table", "props": [
+            ("border-collapse", "collapse"),
+            ("width", "100%")
+        ]}
+    ])
+    return styled
 
 # Start Spark session
 spark = SparkSession.builder \
@@ -30,7 +85,6 @@ spark = SparkSession.builder \
 
 spark.catalog.clearCache()
 
-# Load raw Lightcast data
 df = spark.read.option("header", "true") \
     .option("inferSchema", "true") \
     .option("multiLine", "true") \
@@ -41,11 +95,14 @@ df.createOrReplaceTempView("raw_jobs")
 
 print("Original rows:", df.count())
 print("Original columns:", len(df.columns))
+```
 
+## 2. Check Missing Values
 
-# --------------------------------------------------
-# 1. Check missing values
-# --------------------------------------------------
+Before cleaning, I checked missing values across all columns. This helps identify which variables have strong coverage and which fields require special handling before analysis.
+
+```{python}
+#| echo: true
 
 total_rows = df.count()
 
@@ -57,39 +114,49 @@ null_counts = df.select([
 null_counts.columns = ["column_name", "null_count"]
 null_counts["null_percent"] = (null_counts["null_count"] / total_rows * 100).round(2)
 
-display(null_counts.sort_values("null_count", ascending=False))
+display(style_table(null_counts.sort_values("null_count", ascending=False)))
+```
 
+## 3. Check Duplicate Job Posting IDs
 
-# --------------------------------------------------
-# 2. Check duplicate primary key
-# --------------------------------------------------
+Each job posting should have a unique `ID`. Duplicate IDs can inflate job counts and bias downstream analysis, so I checked whether any IDs appeared more than once.
+
+```{python}
+#| echo: true
 
 duplicate_ids = df.groupBy("ID").count().filter(col("count") > 1)
 
 print("Duplicate job ID groups:", duplicate_ids.count())
 
-display(duplicate_ids.limit(20).toPandas())
+display(style_table(duplicate_ids.limit(20).toPandas()))
+```
 
+## 4. Remove Missing and Duplicate IDs
 
-# --------------------------------------------------
-# 3. Remove missing and duplicate IDs
-# --------------------------------------------------
+Rows with missing IDs were removed because they cannot be reliably treated as unique job postings. Duplicate IDs were also removed so that each job posting appears only once in the cleaned dataset.
+
+```{python}
+#| echo: true
 
 df_clean_base = df.filter(col("ID").isNotNull())
 df_clean_base = df_clean_base.dropDuplicates(["ID"])
 
 print("Rows after removing missing and duplicate IDs:", df_clean_base.count())
+```
 
+## 5. Check Suspicious Salary and Date Values
 
-# --------------------------------------------------
-# 4. Check suspicious salary and date values
-# --------------------------------------------------
+Before creating the final cleaned dataset, I reviewed salary and date fields for suspicious values. Salary values were checked for NaN values, non-positive values, unusually high values, invalid salary ranges, and unparseable posting dates.
+
+```{python}
+#| echo: true
+#| warning: false
+#| message: false
 
 df_check = df_clean_base.withColumn("SALARY", col("SALARY").cast("double")) \
                         .withColumn("SALARY_FROM", col("SALARY_FROM").cast("double")) \
                         .withColumn("SALARY_TO", col("SALARY_TO").cast("double"))
 
-# Note: salaries above 500,000 are flagged as unusually high, not automatically impossible.
 suspicious_values = df_check.filter(
     (col("SALARY").isNotNull() & isnan(col("SALARY")))
     | (col("SALARY") <= 0)
@@ -102,7 +169,7 @@ suspicious_values = df_check.filter(
 
 print("Suspicious rows after removing missing IDs:", suspicious_values.count())
 
-display(
+display(style_table(
     suspicious_values.select(
         "ID",
         "TITLE_CLEAN",
@@ -115,8 +182,7 @@ display(
         "STATE_NAME",
         "REMOTE_TYPE_NAME"
     ).limit(20).toPandas()
-)
-import pandas as pd
+))
 
 checks_pd = pd.DataFrame([
     {"check": "Salary is NaN", "count": df_check.filter(col("SALARY").isNotNull() & isnan(col("SALARY"))).count()},
@@ -125,45 +191,453 @@ checks_pd = pd.DataFrame([
     {"check": "Salary From < 0", "count": df_check.filter(col("SALARY_FROM") < 0).count()},
     {"check": "Salary To < 0", "count": df_check.filter(col("SALARY_TO") < 0).count()},
     {"check": "Salary From > Salary To", "count": df_check.filter(col("SALARY_FROM") > col("SALARY_TO")).count()},
-    {"check": "Unparseable posted date", "count": df_check.filter(to_date(col("POSTED"), "M/d/yyyy").isNull()).count()}
+    {"check": "Unparseable posted date", "count": df_check.filter(to_date(col("POSTED"), "M/d/yyyy").isNull()).count()},
+    {"check": "Original SALARY missing", "count": df_check.filter(col("SALARY").isNull()).count()}
 ])
 
-display(checks_pd)
+display(style_table(checks_pd, {
+    "count": "{:,.0f}"
+}))
+```
 
-missing_salary = df_check.filter(col("SALARY").isNull()).count()
+## 6. Clean Text and Category Fields
 
-print("Rows with missing salary:", missing_salary)
+Important text fields were trimmed to remove extra whitespace. Education values were cleaned by removing newline and carriage-return characters. Missing or `[None]` remote-work values were labeled as `Unknown` instead of being assumed to be on-site.
 
-# --------------------------------------------------
-# 5. Clean data
-# --------------------------------------------------
+```{python}
+#| echo: true
+#| warning: false
+#| message: false
 
 df_clean = df_clean_base
 
-# Trim important text fields
 df_clean = df_clean.withColumn("TITLE_CLEAN", trim(col("TITLE_CLEAN")))
 df_clean = df_clean.withColumn("COMPANY_NAME", trim(col("COMPANY_NAME")))
 df_clean = df_clean.withColumn("CITY_NAME", trim(col("CITY_NAME")))
 df_clean = df_clean.withColumn("STATE_NAME", trim(col("STATE_NAME")))
 df_clean = df_clean.withColumn("REMOTE_TYPE_NAME", trim(col("REMOTE_TYPE_NAME")))
 
-# Convert salary columns to numeric format
+if "EDUCATION_LEVELS_NAME" in df_clean.columns:
+    df_clean = df_clean.withColumn(
+        "EDUCATION_LEVELS_NAME",
+        trim(
+            regexp_replace(
+                regexp_replace(col("EDUCATION_LEVELS_NAME"), r"[\n\r]", " "),
+                r"\s+",
+                " "
+            )
+        )
+    )
+
+df_clean = df_clean.withColumn(
+    "REMOTE_TYPE_NAME",
+    when(
+        col("REMOTE_TYPE_NAME").isNull() | (col("REMOTE_TYPE_NAME") == "[None]"),
+        "Unknown"
+    ).otherwise(col("REMOTE_TYPE_NAME"))
+)
+
 df_clean = df_clean.withColumn("SALARY", col("SALARY").cast("double"))
 df_clean = df_clean.withColumn("SALARY_FROM", col("SALARY_FROM").cast("double"))
 df_clean = df_clean.withColumn("SALARY_TO", col("SALARY_TO").cast("double"))
 
-# Convert posted date to date format
 df_clean = df_clean.withColumn("POSTED_DATE", to_date(col("POSTED"), "M/d/yyyy"))
+
+print("Rows after text and category cleaning:", df_clean.count())
+print("Columns after text and category cleaning:", len(df_clean.columns))
+```
+
+## 7. Create Analysis Salary Variable
+
+Salary is a key outcome variable in this project, so I created an `ANALYSIS_SALARY` field using all available employer-provided salary information. If `SALARY` was available, it was used directly. If `SALARY` was missing but both `SALARY_FROM` and `SALARY_TO` were available, their midpoint was used. If only one salary bound was available, that value was used. This reduces missing salary values without replacing missing salaries with an overall median.
+
+```{python}
+#| echo: true
+#| warning: false
+#| message: false
+
+df_clean = df_clean.withColumn(
+    "ANALYSIS_SALARY",
+    when(
+        col("SALARY").isNotNull()
+        & (col("SALARY") > 0)
+        & (col("SALARY") <= 500000),
+        col("SALARY")
+    ).when(
+        col("SALARY").isNull()
+        & col("SALARY_FROM").isNotNull()
+        & col("SALARY_TO").isNotNull()
+        & (col("SALARY_FROM") > 0)
+        & (col("SALARY_TO") > 0)
+        & (col("SALARY_FROM") <= 500000)
+        & (col("SALARY_TO") <= 500000)
+        & (col("SALARY_FROM") <= col("SALARY_TO")),
+        (col("SALARY_FROM") + col("SALARY_TO")) / 2
+    ).when(
+        col("SALARY").isNull()
+        & col("SALARY_FROM").isNotNull()
+        & (col("SALARY_FROM") > 0)
+        & (col("SALARY_FROM") <= 500000),
+        col("SALARY_FROM")
+    ).when(
+        col("SALARY").isNull()
+        & col("SALARY_TO").isNotNull()
+        & (col("SALARY_TO") > 0)
+        & (col("SALARY_TO") <= 500000),
+        col("SALARY_TO")
+    ).otherwise(None)
+)
 
 df_clean.createOrReplaceTempView("raw_jobs_clean")
 
-print("Rows after cleaning:", df_clean.count())
-print("Columns after cleaning:", len(df_clean.columns))
+print("Rows after creating ANALYSIS_SALARY:", df_clean.count())
+print("Columns after creating ANALYSIS_SALARY:", len(df_clean.columns))
+```
+
+## 8. Check Analysis Salary Availability
+
+This section checks the original analysis salary coverage after using employer-provided salary fields. `ANALYSIS_SALARY` is created from `SALARY`, `SALARY_FROM`, and `SALARY_TO`. This is the main salary variable for primary salary analysis.
+
+```{python}
+#| echo: true
+#| warning: false
+#| message: false
+
+analysis_salary_check = spark.sql("""
+SELECT
+    CASE
+        WHEN ANALYSIS_SALARY IS NOT NULL
+             AND ANALYSIS_SALARY > 0
+        THEN 'Analysis Salary Available'
+        ELSE 'Still Missing Salary'
+    END AS salary_status,
+    COUNT(*) AS job_count,
+    ROUND(COUNT(*) / (SELECT COUNT(*) FROM raw_jobs_clean) * 100, 2) AS job_share
+FROM raw_jobs_clean
+GROUP BY
+    CASE
+        WHEN ANALYSIS_SALARY IS NOT NULL
+             AND ANALYSIS_SALARY > 0
+        THEN 'Analysis Salary Available'
+        ELSE 'Still Missing Salary'
+    END
+ORDER BY job_count DESC
+""").toPandas()
+
+display(style_table(analysis_salary_check, {
+    "job_count": "{:,.0f}",
+    "job_share": "{:.2f}%"
+}))
 
 
-# --------------------------------------------------
-# 6. Save cleaned data
-# --------------------------------------------------
+salary_source_check = spark.sql("""
+SELECT
+    CASE
+        WHEN SALARY IS NOT NULL
+             AND SALARY > 0
+             AND SALARY <= 500000
+        THEN 'Used SALARY'
+
+        WHEN SALARY IS NULL
+             AND SALARY_FROM IS NOT NULL
+             AND SALARY_TO IS NOT NULL
+             AND SALARY_FROM > 0
+             AND SALARY_TO > 0
+             AND SALARY_FROM <= 500000
+             AND SALARY_TO <= 500000
+             AND SALARY_FROM <= SALARY_TO
+        THEN 'Used average of SALARY_FROM and SALARY_TO'
+
+        WHEN SALARY IS NULL
+             AND SALARY_FROM IS NOT NULL
+             AND SALARY_FROM > 0
+             AND SALARY_FROM <= 500000
+        THEN 'Used SALARY_FROM only'
+
+        WHEN SALARY IS NULL
+             AND SALARY_TO IS NOT NULL
+             AND SALARY_TO > 0
+             AND SALARY_TO <= 500000
+        THEN 'Used SALARY_TO only'
+
+        ELSE 'Still missing salary'
+    END AS salary_source,
+    COUNT(*) AS job_count
+FROM raw_jobs_clean
+GROUP BY
+    CASE
+        WHEN SALARY IS NOT NULL
+             AND SALARY > 0
+             AND SALARY <= 500000
+        THEN 'Used SALARY'
+
+        WHEN SALARY IS NULL
+             AND SALARY_FROM IS NOT NULL
+             AND SALARY_TO IS NOT NULL
+             AND SALARY_FROM > 0
+             AND SALARY_TO > 0
+             AND SALARY_FROM <= 500000
+             AND SALARY_TO <= 500000
+             AND SALARY_FROM <= SALARY_TO
+        THEN 'Used average of SALARY_FROM and SALARY_TO'
+
+        WHEN SALARY IS NULL
+             AND SALARY_FROM IS NOT NULL
+             AND SALARY_FROM > 0
+             AND SALARY_FROM <= 500000
+        THEN 'Used SALARY_FROM only'
+
+        WHEN SALARY IS NULL
+             AND SALARY_TO IS NOT NULL
+             AND SALARY_TO > 0
+             AND SALARY_TO <= 500000
+        THEN 'Used SALARY_TO only'
+
+        ELSE 'Still missing salary'
+    END
+ORDER BY job_count DESC
+""").toPandas()
+
+display(style_table(salary_source_check, {
+    "job_count": "{:,.0f}"
+}))
+```
+
+**Result:** After using `SALARY`, `SALARY_FROM`, and `SALARY_TO`, 32,394 postings have usable `ANALYSIS_SALARY`, while 40,082 postings remain missing salary. This original `ANALYSIS_SALARY` variable is used for the main salary analysis.
+
+## 9. Create Industry-Median Imputed Salary Variable
+
+This step creates a separate salary variable for sensitivity analysis. Missing salaries are imputed using the median salary within the same industry only when that industry has at least 50% salary availability and at least 30 valid salary observations. The original `ANALYSIS_SALARY` column is not replaced.
+
+```{python}
+#| echo: true
+#| warning: false
+#| message: false
+
+industry_salary_quality = df_clean.groupBy("NAICS_2022_6_NAME").agg(
+    count("*").alias("total_postings"),
+    count(
+        when(
+            (col("ANALYSIS_SALARY").isNotNull()) & (col("ANALYSIS_SALARY") > 0),
+            1
+        )
+    ).alias("salary_available_count"),
+    percentile_approx(
+        when(
+            (col("ANALYSIS_SALARY").isNotNull()) & (col("ANALYSIS_SALARY") > 0),
+            col("ANALYSIS_SALARY")
+        ),
+        0.5
+    ).alias("industry_median_salary")
+)
+
+industry_salary_quality = industry_salary_quality.withColumn(
+    "salary_available_percent",
+    round(col("salary_available_count") / col("total_postings") * 100, 2)
+)
+
+qualified_industry_medians = industry_salary_quality.filter(
+    (col("salary_available_percent") >= 50) &
+    (col("salary_available_count") >= 30) &
+    (col("industry_median_salary").isNotNull())
+).select(
+    "NAICS_2022_6_NAME",
+    "industry_median_salary",
+    "salary_available_count",
+    "salary_available_percent"
+)
+
+df_clean = df_clean.join(
+    qualified_industry_medians,
+    on="NAICS_2022_6_NAME",
+    how="left"
+)
+
+df_clean = df_clean.withColumn(
+    "ANALYSIS_SALARY_INDUSTRY_IMPUTED",
+    when(
+        (col("ANALYSIS_SALARY").isNotNull()) & (col("ANALYSIS_SALARY") > 0),
+        col("ANALYSIS_SALARY")
+    ).when(
+        ((col("ANALYSIS_SALARY").isNull()) | (col("ANALYSIS_SALARY") <= 0)) &
+        (col("industry_median_salary").isNotNull()),
+        col("industry_median_salary")
+    ).otherwise(None)
+)
+
+df_clean = df_clean.withColumn(
+    "SALARY_IMPUTATION_STATUS",
+    when(
+        (col("ANALYSIS_SALARY").isNotNull()) & (col("ANALYSIS_SALARY") > 0),
+        "Observed salary"
+    ).when(
+        ((col("ANALYSIS_SALARY").isNull()) | (col("ANALYSIS_SALARY") <= 0)) &
+        (col("industry_median_salary").isNotNull()),
+        "Imputed using qualified industry median"
+    ).otherwise("Still missing")
+)
+
+df_clean.createOrReplaceTempView("raw_jobs_clean")
+
+imputation_status_check = spark.sql("""
+SELECT
+    SALARY_IMPUTATION_STATUS AS salary_status_after_imputation,
+    COUNT(*) AS job_count,
+    ROUND(COUNT(*) / (SELECT COUNT(*) FROM raw_jobs_clean) * 100, 2) AS job_share
+FROM raw_jobs_clean
+GROUP BY
+    SALARY_IMPUTATION_STATUS
+ORDER BY
+    job_count DESC
+""").toPandas()
+
+display(style_table(imputation_status_check, {
+    "job_count": "{:,.0f}",
+    "job_share": "{:.2f}%"
+}))
+```
+
+**Result:** The imputation process keeps 32,394 observed salaries unchanged and imputes 6,850 additional missing salaries using qualified industry medians. The remaining 33,232 postings still have missing salary values.
+
+## 10. Check Final Salary Availability After Imputation
+
+This section summarizes final salary availability after adding the industry-median imputed salary variable.
+
+```{python}
+#| echo: true
+#| warning: false
+#| message: false
+
+final_salary_availability_after_impute = spark.sql("""
+SELECT
+    CASE
+        WHEN ANALYSIS_SALARY_INDUSTRY_IMPUTED IS NOT NULL
+             AND ANALYSIS_SALARY_INDUSTRY_IMPUTED > 0
+        THEN 'Salary Available After Imputation'
+        ELSE 'Still Missing After Imputation'
+    END AS final_salary_status,
+    COUNT(*) AS job_count,
+    ROUND(COUNT(*) / (SELECT COUNT(*) FROM raw_jobs_clean) * 100, 2) AS job_share
+FROM raw_jobs_clean
+GROUP BY
+    CASE
+        WHEN ANALYSIS_SALARY_INDUSTRY_IMPUTED IS NOT NULL
+             AND ANALYSIS_SALARY_INDUSTRY_IMPUTED > 0
+        THEN 'Salary Available After Imputation'
+        ELSE 'Still Missing After Imputation'
+    END
+ORDER BY job_count DESC
+""").toPandas()
+
+display(style_table(final_salary_availability_after_impute, {
+    "job_count": "{:,.0f}",
+    "job_share": "{:.2f}%"
+}))
+```
+
+**Result:** After applying qualified industry-median imputation, the usable salary sample increases from 32,394 postings to 39,244 postings. A total of 33,232 postings remain missing salary after imputation. The main analysis should use `ANALYSIS_SALARY`, while `ANALYSIS_SALARY_INDUSTRY_IMPUTED` should be used only for sensitivity analysis.
+
+## 11. Investigate Remaining Missing Salary After Imputation
+
+After industry-median imputation, some postings still have missing salary values. These are postings where no valid salary was available and the industry did not have enough salary coverage to support reliable median imputation.
+
+```{python}
+#| echo: true
+#| warning: false
+#| message: false
+
+missing_salary_reason_after_impute = spark.sql("""
+SELECT
+    CASE
+        WHEN SALARY IS NULL AND SALARY_FROM IS NULL AND SALARY_TO IS NULL
+        THEN 'All salary fields missing'
+
+        WHEN SALARY IS NULL AND SALARY_FROM IS NULL AND SALARY_TO IS NOT NULL
+        THEN 'Only SALARY_TO exists but invalid'
+
+        WHEN SALARY IS NULL AND SALARY_FROM IS NOT NULL AND SALARY_TO IS NULL
+        THEN 'Only SALARY_FROM exists but invalid'
+
+        WHEN SALARY IS NULL AND SALARY_FROM IS NOT NULL AND SALARY_TO IS NOT NULL
+        THEN 'Salary range exists but invalid'
+
+        ELSE 'Other'
+    END AS missing_reason,
+    COUNT(*) AS job_count
+FROM raw_jobs_clean
+WHERE ANALYSIS_SALARY_INDUSTRY_IMPUTED IS NULL
+GROUP BY
+    CASE
+        WHEN SALARY IS NULL AND SALARY_FROM IS NULL AND SALARY_TO IS NULL
+        THEN 'All salary fields missing'
+
+        WHEN SALARY IS NULL AND SALARY_FROM IS NULL AND SALARY_TO IS NOT NULL
+        THEN 'Only SALARY_TO exists but invalid'
+
+        WHEN SALARY IS NULL AND SALARY_FROM IS NOT NULL AND SALARY_TO IS NULL
+        THEN 'Only SALARY_FROM exists but invalid'
+
+        WHEN SALARY IS NULL AND SALARY_FROM IS NOT NULL AND SALARY_TO IS NOT NULL
+        THEN 'Salary range exists but invalid'
+
+        ELSE 'Other'
+    END
+ORDER BY job_count DESC
+""").toPandas()
+
+display(style_table(missing_salary_reason_after_impute, {
+    "job_count": "{:,.0f}"
+}))
+
+
+missing_salary_by_industry_after_impute = spark.sql("""
+SELECT
+    NAICS2_NAME,
+    COUNT(*) AS missing_salary_count
+FROM raw_jobs_clean
+WHERE ANALYSIS_SALARY_INDUSTRY_IMPUTED IS NULL
+  AND NAICS2_NAME IS NOT NULL
+GROUP BY
+    NAICS2_NAME
+ORDER BY
+    missing_salary_count DESC
+LIMIT 20
+""").toPandas()
+
+display(style_table(missing_salary_by_industry_after_impute, {
+    "missing_salary_count": "{:,.0f}"
+}))
+
+
+missing_salary_by_state_after_impute = spark.sql("""
+SELECT
+    STATE_NAME,
+    COUNT(*) AS missing_salary_count
+FROM raw_jobs_clean
+WHERE ANALYSIS_SALARY_INDUSTRY_IMPUTED IS NULL
+  AND STATE_NAME IS NOT NULL
+GROUP BY
+    STATE_NAME
+ORDER BY
+    missing_salary_count DESC
+LIMIT 20
+""").toPandas()
+
+display(style_table(missing_salary_by_state_after_impute, {
+    "missing_salary_count": "{:,.0f}"
+}))
+```
+
+Most remaining missing salary records still represent postings where all salary fields are missing and the posting’s industry did not meet the threshold for reliable median imputation. These postings are retained for non-salary analysis but excluded from the main salary analysis and salary prediction models.
+
+## 12. Save the Cleaned Dataset
+
+The cleaned dataset is saved as a Parquet file. Downstream pages should load this cleaned file instead of the raw CSV.
+
+```{python}
+#| echo: true
+#| warning: false
+#| message: false
 
 os.makedirs("data/cleaned", exist_ok=True)
 
@@ -171,11 +645,3 @@ df_clean.write.mode("overwrite").parquet("data/cleaned/lightcast_cleaned.parquet
 
 print("Saved cleaned data to: data/cleaned/lightcast_cleaned.parquet")
 ```
-
-## Cleaning Findings
-
-The main data quality issue found in the raw dataset was missing job posting IDs. The dataset originally contained 72,498 rows, and 22 rows had missing IDs. Since the job posting ID is required as the primary identifier for each job posting, these 22 rows were removed. After removing missing and duplicate IDs, the cleaned dataset contained 72,476 rows.
-
-After removing the rows with missing IDs, I checked for suspicious salary and date values. No impossible salary values were found based on the selected checks, including zero or negative salaries, salaries above $500,000, negative salary ranges, cases where salary_from was greater than salary_to, or unparseable posting dates.
-
-However, 41,668 records had missing salary values. These records were kept in the cleaned dataset because missing salary does not make a job posting invalid. These postings can still be used for non-salary analysis, such as company counts, location trends, remote-work analysis, industry analysis, and skill analysis. For salary-related analysis, I will apply salary-specific filters and use only records with valid salary values.
