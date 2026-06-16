@@ -1,7 +1,7 @@
 ---
 title: "Skill Gap Analysis"
 subtitle: "Team Skills vs Market Demands"
-author: "Group C"
+author: "Lo Ying Wu, Tsyr Rau Chen "
 date: 06/04/2026
 format: 
   html:

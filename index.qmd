@@ -1,7 +1,37 @@
 ---
-title: "ad688-employability-sp25A1-groupC"
+title: "Job Market Analysis 2024"
+subtitle: "A Data-Driven Look at Salaries, Regions, and Career Trends"
+author: "Afreen Alam, Lo Ying Wu, Nutchanon Chaiyaratana, Tsyr Rau Chen "
+date: "06/04/2026"
+format:
+  html:
+    toc: false
 ---
 
-This is a Quarto website.
+## About This Project
 
-To learn more about Quarto websites visit <https://quarto.org/docs/websites>.
+This is a structured research report analyzing job market trends based on real data from the **Lightcast job postings dataset**. Using Python and Quarto, we explore how salaries, regions, and job types differ across AI and non-AI careers in 2024.
+
+Our analysis includes charts, tables, and data-driven insights — covering everything from wage gaps to remote work trends.
+
+---
+
+## Research Questions
+
+We structured our analysis around four core questions:
+
+1. **How do salaries differ across AI vs. non-AI careers?**
+2. **What regions offer the highest-paying jobs in AI-related and traditional careers?**
+3. **Are remote jobs better paying than in-office roles?**
+4. **What industries saw the biggest wage growth in 2024?**
+
+---
+
+## Meet the Team
+
+| Name | Background |
+|------|------------|
+| Afreen Alam | MS Applied Business Analytics, Boston University |
+| Nutchanon Chaiyaratana | MS Applied Business Analytics, Boston University |
+| Lo Ying Wu | MS Applied Business Analytics, Boston University |
+| Tsyr Rau Chen | MS Applied Business Analytics, Boston University |

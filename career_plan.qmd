@@ -1,3 +1,17 @@
+---
+title: "Career Strategy"
+author: "Lo Ying Wu, Tsyr Rau Chen "
+date: 06/04/2026
+format: 
+  html:
+    toc: true
+    code-fold: true
+    embed-resources: true 
+execute:
+  echo: true
+  eval: true
+---
+
 ## Summary
 
 To bridge the gap between our current capabilities and market expectations, 
