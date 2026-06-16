@@ -1,0 +1,30 @@
+## Summary
+
+To bridge the gap between our current capabilities and market expectations, 
+we conducted a structured skill gap analysis comparing our team's self-assessed 
+proficiency against demand data from the Lightcast job postings dataset.
+
+Each skill was rated on a 1–5 scale, and market demand frequencies were normalized 
+to the same scale for direct comparison. The gap score reflects how far our team 
+average falls below what employers currently expect.
+
+| Skill | Team Avg | Market (1–5) | Gap | Priority |
+|-------|----------|--------------|-----|----------|
+| Python | 2.5 | 4.75 | 2.25 | 🔴 High |
+| Machine Learning | 1.75 | 3.75 | 2.00 | 🔴 High |
+| Cloud Computing | 1.50 | 3.25 | 1.75 | 🔴 High |
+| SQL | 2.50 | 4.40 | 1.90 | 🔴 High |
+| Git/GitHub | 1.25 | 2.60 | 1.35 | 🟡 Medium |
+| R | 1.75 | 2.25 | 0.50 | 🟡 Medium |
+| Statistical Analysis | 2.75 | 3.00 | 0.25 | 🟢 Low |
+
+
+The results reveal four high-priority skills — **Python, SQL, Machine Learning, 
+and Cloud Computing** — where the gap exceeds 1.5 points. These represent the most 
+critical areas for development, as they are both heavily demanded by employers and 
+currently underdeveloped across the team.
+
+**Git/GitHub** falls in the medium priority range numerically, but given its 
+foundational role in any collaborative technical environment, it warrants early 
+attention. **Statistical Analysis** is the team's strongest area relative to market 
+expectations and requires only maintenance rather than urgent upskilling.

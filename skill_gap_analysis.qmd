@@ -7,6 +7,7 @@ format:
   html:
     toc: true
     code-fold: true
+    embed-resources: true 
 execute:
   echo: true
   eval: true
@@ -456,19 +457,3 @@ for skill in high_priority.index:
             print(f"  • {resource}")
 ```
 ---
-
-## Summary
-
-This skill gap analysis reveals a team that is building a solid foundation but has significant room to grow in areas the market increasingly considers baseline competencies.
-
-| Skill | Team Avg | Market (1–5) | Gap | Priority |
-|-------|----------|--------------|-----|----------|
-| Python | 2.5 | 4.75 | 2.25 | 🔴 High |
-| Machine Learning | 1.75 | 3.75 | 2.00 | 🔴 High |
-| Cloud Computing | 1.50 | 3.25 | 1.75 | 🔴 High |
-| Git/GitHub | 1.25 | 2.60 | 1.35 | 🟡 Medium |
-| R | 1.75 | 2.25 | 0.50 | 🟡 Medium |
-| Statistical Analysis | 2.75 | 3.00 | 0.25 | 🟢 Low |
-| SQL | 2.50 | 4.40 | 1.90 | 🔴 High |
-
-The most actionable takeaway: **Python and SQL should be the immediate focus for all team members**, as they represent both the highest market demand and among the largest gaps. Complementing these with Git/GitHub fluency would quickly make any team member job-ready for entry-level data roles. Machine Learning and Cloud Computing can follow as intermediate-term goals once foundational scripting skills are solidified.
