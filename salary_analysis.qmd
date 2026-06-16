@@ -34,7 +34,6 @@ Because salary information is not available for every job posting, this analysis
 #| warning: false
 #| message: false
 
-# load data + create tables here
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, monotonically_increasing_id
 
@@ -45,22 +44,13 @@ spark = SparkSession.builder \
 
 spark.catalog.clearCache()
 
-df = spark.read.option("header", "true") \
-    .option("inferSchema", "true") \
-    .option("multiLine", "true") \
-    .option("escape", "\"") \
-    .csv("data/lightcast_job_postings.csv")
+# Load cleaned dataset from data_cleaning.qmd
+df_clean = spark.read.parquet("data/cleaned/lightcast_cleaned.parquet")
+df_clean.createOrReplaceTempView("raw_jobs_clean")
 
-df.createOrReplaceTempView("raw_jobs")
-# Basic cleaning: remove records without a job posting ID
-
-df_clean = df.filter(col("ID").isNotNull())
-
-df_clean.createOrReplaceTempView("raw_jobs")
-
-print("Original rows:", df.count())
-
-print("Rows after removing missing ID:", df_clean.count())
+print("Cleaned rows:", df_clean.count())
+print("Cleaned columns:", len(df_clean.columns))
+print("Has imputed salary column:", "ANALYSIS_SALARY_INDUSTRY_IMPUTED" in df_clean.columns)
 
 # companies table
 companies_df = df_clean.select(
@@ -150,8 +140,8 @@ occupations_df.createOrReplaceTempView("occupations")
 job_with_industry = df_clean.join(
     industries_df,
     (
-        (df["NAICS_2022_6"] == industries_df["naics_2022_6"]) &
-        (df["NAICS_2022_6_NAME"] == industries_df["naics_2022_6_name"])
+        (df_clean["NAICS_2022_6"] == industries_df["naics_2022_6"]) &
+        (df_clean["NAICS_2022_6_NAME"] == industries_df["naics_2022_6_name"])
     ),
     "left"
 )
@@ -193,16 +183,21 @@ job_postings_df = job_with_keys.select(
     job_with_keys["BODY"].alias("body"),
     job_with_keys["MIN_YEARS_EXPERIENCE"].alias("min_years_experience"),
     job_with_keys["MAX_YEARS_EXPERIENCE"].alias("max_years_experience"),
-    job_with_keys["SALARY"].alias("salary"),
+    job_with_keys["SALARY"].alias("original_salary"),
     job_with_keys["SALARY_FROM"].alias("salary_from"),
     job_with_keys["SALARY_TO"].alias("salary_to"),
+    job_with_keys["ANALYSIS_SALARY"].alias("observed_analysis_salary"),
+    job_with_keys["ANALYSIS_SALARY_INDUSTRY_IMPUTED"].alias("salary"),
+    job_with_keys["SALARY_IMPUTATION_STATUS"].alias("salary_imputation_status"),
     col("location_id"),
+    job_with_keys["POSTED_DATE"].alias("posted_date"),
     job_with_keys["POSTED"].alias("posted"),
     job_with_keys["EXPIRED"].alias("expired"),
     job_with_keys["DURATION"].alias("duration")
 ).filter(
     col("id").isNotNull()
 ).dropDuplicates(["id"])
+
 job_postings_df.createOrReplaceTempView("job_postings")
 ```
 ## Skill Table
@@ -448,8 +443,10 @@ job_postings_preview = job_postings_df.select(
     "industry_id",
     "occupation_id",
     "location_id",
+    "observed_analysis_salary",
     "salary",
-    "posted"
+    "salary_imputation_status",
+    "posted_date"
 ).limit(5).toPandas()
 
 style_table(job_postings_preview)
@@ -672,24 +669,54 @@ style_table(ai_vs_non_ai_salary_pd, {
 #| fig-width: 7
 #| fig-height: 4
 
-import seaborn as sns
-import matplotlib.pyplot as plt
+#| label: fig-ai-vs-non-ai-salary
+#| fig-cap: "Average Salary: AI-Related vs. Non-AI Job Postings"
+#| echo: true
+#| warning: false
+#| message: false
 
-fig, ax = plt.subplots(figsize=(7, 4))
+import plotly.express as px
 
-sns.barplot(
-    data=ai_vs_non_ai_salary_pd,
+fig_ai_salary = px.bar(
+    ai_vs_non_ai_salary_pd,
     x="career_type",
     y="avg_salary",
-    ax=ax
+    text="avg_salary",
+    color="career_type",
+    title="Average Salary: AI-Related vs. Non-AI Job Postings",
+    labels={
+        "career_type": "Career Type",
+        "avg_salary": "Average Salary"
+    },
+    color_discrete_map={
+        "AI-related": "#636EFA",
+        "Non-AI": "#00CC96"
+    }
 )
 
-ax.set_title("Average Salary: AI-Related vs. Non-AI Job Postings")
-ax.set_xlabel("Career Type")
-ax.set_ylabel("Average Salary")
+fig_ai_salary.update_traces(
+    texttemplate="$%{text:,.0f}",
+    textposition="outside",
+    marker_line_width=0
+)
 
-plt.tight_layout()
-plt.show()
+fig_ai_salary.update_layout(
+    template="plotly_white",
+    height=420,
+    margin=dict(l=60, r=40, t=70, b=60),
+    title=dict(x=0.02, xanchor="left"),
+    showlegend=False,
+    font=dict(size=12),
+    yaxis=dict(
+        title="Average Salary",
+        gridcolor="rgba(0,0,0,0.08)"
+    ),
+    xaxis=dict(
+        title="Career Type"
+    )
+)
+
+fig_ai_salary.show()
 ```
 
 AI-related postings are identified using both Lightcast skill tags and AI-related keywords in job titles and descriptions. This combined classification reduces the chance of missing AI-related jobs that are not tagged with AI skills directly. The comparison uses only postings with valid salary values.
