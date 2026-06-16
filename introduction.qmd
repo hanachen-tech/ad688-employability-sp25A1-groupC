@@ -1,6 +1,6 @@
 ---
 title: "Research Introduction: Salary & Compensation Trends"
-author: "Team C"
+author: "Afreen Alam, Lo Ying Wu, Tsyr Rau Chen"
 date: 2026-05-31
 format: 
   html:
