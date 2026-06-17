@@ -720,3 +720,209 @@ fig_ai_salary.show()
 ```
 
 AI-related postings are identified using both Lightcast skill tags and AI-related keywords in job titles and descriptions. This combined classification reduces the chance of missing AI-related jobs that are not tagged with AI skills directly. The comparison uses only postings with valid salary values.
+
+## How do salaries differ across AI vs. non-AI careers?
+```{python}
+import us
+
+salary_distribution = spark.sql("""
+SELECT
+    CASE
+        WHEN a.job_id IS NOT NULL THEN 'AI-related'
+        ELSE 'Non-AI'
+    END AS career_type,
+    CAST(j.salary AS DOUBLE) AS salary
+FROM job_postings j
+LEFT JOIN ai_job_ids a
+    ON j.id = a.job_id
+WHERE
+    j.salary IS NOT NULL
+    AND CAST(j.salary AS DOUBLE) > 0
+""")
+
+salary_distribution_pd = salary_distribution.toPandas()
+
+import plotly.express as px
+
+fig = px.box(
+    salary_distribution_pd,
+    x="career_type",
+    y="salary",
+    color="career_type",
+    points=False,
+    title="Salary Distribution: AI vs Non-AI Careers"
+)
+
+fig.update_layout(
+    template="plotly_white",
+    showlegend=False,
+    yaxis_title="Salary ($)",
+    xaxis_title=""
+)
+
+fig.show()
+```
+
+## What regions offer the highest-paying jobs in AI-related and traditional careers?
+```{python}
+jobs_with_ai = (
+    job_postings_df.alias("j")
+    .join(
+        ai_job_ids.alias("a"),
+        col("j.id") == col("a.job_id"),
+        "left"
+    )
+    .withColumn(
+        "career_type",
+        when(col("a.job_id").isNotNull(), "AI-related")
+        .otherwise("Non-AI")
+    )
+)
+jobs_with_ai.createOrReplaceTempView("jobs_with_ai")
+
+state_salary = spark.sql("""
+SELECT
+    l.state_name,
+    j.career_type,
+    AVG(CAST(j.salary AS DOUBLE)) AS avg_salary
+FROM jobs_with_ai j
+JOIN locations l
+    ON j.location_id = l.location_id
+WHERE
+    j.salary IS NOT NULL
+    AND CAST(j.salary AS DOUBLE) > 0
+GROUP BY
+    l.state_name,
+    j.career_type
+""")
+
+state_salary_pd = state_salary.toPandas()
+pivot_df = (
+    state_salary_pd
+    .pivot(
+        index="state_name",
+        columns="career_type",
+        values="avg_salary"
+    )
+    .reset_index()
+)
+
+pivot_df["premium_dollars"] = (
+    pivot_df["AI-related"] -
+    pivot_df["Non-AI"]
+)
+
+pivot_df["premium_pct"] = (
+    (pivot_df["AI-related"] -
+     pivot_df["Non-AI"])
+    / pivot_df["Non-AI"]
+) * 100
+
+fig = px.choropleth(
+    pivot_df,
+    locations="state_code",
+    locationmode="USA-states",
+    color="premium_pct",
+    scope="usa",
+    hover_name="state_name",
+    hover_data={
+        "ai_salary": ":,.0f",
+        "non_ai_salary": ":,.0f",
+        "ai_salary_premium": ":,.0f"
+    },
+    color_continuous_scale="RdYlGn",
+    title="AI Salary Premium (%) by State"
+)
+
+fig.update_layout(
+    template="plotly_white",
+    height=550
+)
+
+fig.show()
+
+```
+## Are remote jobs better paying than in-office roles?
+```{python}
+remote_salary = spark.sql("""
+SELECT
+    COALESCE(remote_type_name,'Unknown') AS remote_type,
+    CAST(salary AS DOUBLE) AS salary
+FROM job_postings
+WHERE
+    salary IS NOT NULL
+    AND CAST(salary AS DOUBLE) > 0
+    AND remote_type != 'Unknown'
+""")
+
+remote_salary_pd = remote_salary.toPandas()
+
+fig = px.box(
+    remote_salary_pd,
+    x="remote_type",
+    y="salary",
+    color="remote_type",
+    title="Salary by Remote Work Arrangement"
+)
+
+fig.update_layout(
+    template="plotly_white",
+    showlegend=False,
+    yaxis_title="Salary ($)",
+    xaxis_title=""
+)
+
+fig.show()
+```
+## What industries saw the biggest wage growth in 2024?
+```{python}
+industry_salary_monthly = spark.sql("""
+SELECT
+    i.naics_2022_6_name AS industry,
+    MONTH(j.posted_date) AS month_num,
+    DATE_FORMAT(j.posted_date, 'MMM') AS month,
+    ROUND(
+        AVG(CAST(j.salary AS DOUBLE)),0) AS avg_salary
+FROM job_postings j
+LEFT JOIN industries i
+    ON j.industry_id = i.industry_id
+WHERE
+    YEAR(j.posted_date) = 2024
+    AND j.salary IS NOT NULL
+GROUP BY
+    i.naics_2022_6_name,
+    MONTH(j.posted_date), DATE_FORMAT(j.posted_date, 'MMM')
+ORDER BY industry, MONTH(j.posted_date)
+""")
+
+industry_salary_monthly_pd = industry_salary_monthly.toPandas()
+
+top_industries = (
+    industry_salary_monthly_pd
+    .groupby("industry")["avg_salary"]
+    .mean()
+    .nlargest(12)
+    .index
+)
+
+plot_df = industry_salary_monthly_pd[
+    industry_salary_monthly_pd["industry"].isin(top_industries)
+]
+
+fig = px.line(
+    plot_df,
+    x="month",
+    y="avg_salary",
+    color="industry",
+    markers=True,
+    title="Monthly Salary Trends by Industry (2024)"
+)
+
+fig.update_layout(
+    template="plotly_white",
+    xaxis_title="Month",
+    yaxis_title="Average Salary"
+)
+
+fig.show()
+```
