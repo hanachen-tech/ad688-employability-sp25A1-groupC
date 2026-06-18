@@ -1,6 +1,6 @@
 ---
 title: "Salary & Compensation Trends"
-author: "Nutchanon Chaiyaratana"
+author: "Nutchanon Chaiyaratana and Afreen Alam"
 date: today
 format:
   html:
@@ -8,6 +8,8 @@ format:
     toc: true
     toc-depth: 2
     embed-resources: true
+    code-fold: true
+    code-summary: "Show code"
 date-modified: today
 date-format: long
 execute:
@@ -662,63 +664,6 @@ style_table(ai_vs_non_ai_salary_pd, {
     "job_share": "{:.1%}"
 })
 ```
-
-```{python}
-#| label: fig-ai-vs-non-ai-salary
-#| fig-cap: "Average Salary: AI-Related vs. Non-AI Job Postings"
-#| fig-width: 7
-#| fig-height: 4
-
-#| label: fig-ai-vs-non-ai-salary
-#| fig-cap: "Average Salary: AI-Related vs. Non-AI Job Postings"
-#| echo: true
-#| warning: false
-#| message: false
-
-import plotly.express as px
-
-fig_ai_salary = px.bar(
-    ai_vs_non_ai_salary_pd,
-    x="career_type",
-    y="avg_salary",
-    text="avg_salary",
-    color="career_type",
-    title="Average Salary: AI-Related vs. Non-AI Job Postings",
-    labels={
-        "career_type": "Career Type",
-        "avg_salary": "Average Salary"
-    },
-    color_discrete_map={
-        "AI-related": "#636EFA",
-        "Non-AI": "#00CC96"
-    }
-)
-
-fig_ai_salary.update_traces(
-    texttemplate="$%{text:,.0f}",
-    textposition="outside",
-    marker_line_width=0
-)
-
-fig_ai_salary.update_layout(
-    template="plotly_white",
-    height=420,
-    margin=dict(l=60, r=40, t=70, b=60),
-    title=dict(x=0.02, xanchor="left"),
-    showlegend=False,
-    font=dict(size=12),
-    yaxis=dict(
-        title="Average Salary",
-        gridcolor="rgba(0,0,0,0.08)"
-    ),
-    xaxis=dict(
-        title="Career Type"
-    )
-)
-
-fig_ai_salary.show()
-```
-
 AI-related postings are identified using both Lightcast skill tags and AI-related keywords in job titles and descriptions. This combined classification reduces the chance of missing AI-related jobs that are not tagged with AI skills directly. The comparison uses only postings with valid salary values.
 
 ## How do salaries differ across AI vs. non-AI careers?
@@ -743,7 +688,7 @@ salary_distribution_pd = salary_distribution.toPandas()
 
 import plotly.express as px
 
-fig = px.box(
+fig_ai_salary = px.box(
     salary_distribution_pd,
     x="career_type",
     y="salary",
@@ -752,15 +697,16 @@ fig = px.box(
     title="Salary Distribution: AI vs Non-AI Careers"
 )
 
-fig.update_layout(
+fig_ai_salary.update_layout(
     template="plotly_white",
     showlegend=False,
     yaxis_title="Salary ($)",
     xaxis_title=""
 )
 
-fig.show()
+fig_ai_salary.show()
 ```
+AI-related roles command higher salaries than non-AI roles, with Q1, median and Q3 quartile appearing elevated.
 
 ## What regions offer the highest-paying jobs in AI-related and traditional careers?
 ```{python}
@@ -839,7 +785,7 @@ state_abbrev = {
 pivot_df["state_code"] = pivot_df["state_name"].map(state_abbrev)
 pivot_df = pivot_df.dropna(subset=["state_code"])
 
-fig = px.choropleth(
+fig_ai_premium = px.choropleth(
     pivot_df,
     locations="state_code",
     locationmode="USA-states",
@@ -857,12 +803,12 @@ fig = px.choropleth(
     title="AI Salary Premium (%) by State"
 )
 
-fig.update_layout(
+fig_ai_premium.update_layout(
     template="plotly_white",
     height=550
 )
 
-fig.show()
+#fig_ai_premium.show()
 
 ```
 ## Are remote jobs better paying than in-office roles?
@@ -880,7 +826,7 @@ WHERE
 
 remote_salary_pd = remote_salary.toPandas()
 
-fig = px.box(
+fig_remote = px.box(
     remote_salary_pd,
     x="remote_type",
     y="salary",
@@ -888,14 +834,14 @@ fig = px.box(
     title="Salary by Remote Work Arrangement"
 )
 
-fig.update_layout(
+fig_remote.update_layout(
     template="plotly_white",
     showlegend=False,
     yaxis_title="Salary ($)",
     xaxis_title=""
 )
 
-fig.show()
+#fig_remote.show()
 ```
 ## What industries saw the biggest wage growth in 2024?
 ```{python}
@@ -931,21 +877,96 @@ top_industries = (
 plot_df = industry_salary_monthly_pd[
     industry_salary_monthly_pd["industry"].isin(top_industries)
 ]
+month_order = [
+    "May", "Jun",
+    "Jul", "Aug", "Sep"
+]
 
-fig = px.line(
+fig_industry = px.line(
     plot_df,
     x="month",
     y="avg_salary",
     color="industry",
     markers=True,
+    category_orders={"month": month_order},
     title="Monthly Salary Trends by Industry (2024)"
 )
 
-fig.update_layout(
+fig_industry.update_layout(
     template="plotly_white",
     xaxis_title="Month",
     yaxis_title="Average Salary"
 )
 
-fig.show()
+#fig_industry.show()
 ```
+
+## Salary & Compensation Trends Dashboard
+
+A visual summary comparing AI and traditional compensation packages across states, work arrangements, and industries.
+
+::: {#dashboard-layout layout="[[50, 50], [50, 50]]"}
+
+```{python}
+#| echo: false
+#| label: fig-ai-salary
+#| fig-cap: "AI vs Non-AI Salaries"
+
+fig_ai_salary.update_layout(
+    margin=dict(l=20, r=20, t=40, b=20),
+    height=400
+)
+fig_ai_salary.show()
+```
+```{python}
+#| echo: false
+#| label: fig-ai-premium
+#| fig-cap: "AI Premium (%) by State"
+
+# Fix the map scope so it's not a tiny world map
+fig_ai_premium.update_geos(scope='usa')
+fig_ai_premium.update_layout(
+    margin=dict(l=20, r=20, t=40, b=20),
+    height = 400,
+    coloraxis_colorbar=dict(
+        len=0.6,           # Shrinks the vertical height (60% of chart height instead of 100%)
+        thickness=15,      # Makes the bar a bit slimmer
+        yanchor="center",  # Center vertically relative to the map
+        y=0.5,
+        title=dict(font=dict(size=11)),
+        tickfont=dict(size=10)
+    )
+
+)
+fig_ai_premium.show()
+```
+```{python}
+#| echo: false
+#| label: fig-remote
+#| fig-cap: "Salary Distribution By Work-Arrangement"
+
+fig_remote.update_layout(margin=dict(l=20, r=20, t=40, b=20))
+fig_remote.show()
+```
+
+```{python}
+#| echo: false
+#| label: fig-industry
+#| fig-cap: "Salary Growth By Industry"
+
+fig_industry.update_layout(
+    legend=dict(
+        orientation="h", 
+        yanchor="top", 
+        y=-0.35,              # Pushes it further below the "Month" label
+        xanchor="center", 
+        x=0.5,
+        font=dict(size=9)     # Slightly smaller font keeps multi-row text compact
+    ),
+    margin=dict(l=20, r=20, t=40, b=120),  
+    height=400
+)
+fig_industry.update_xaxes(categoryorder='array', categoryarray=['May', 'Jun', 'Jul', 'Aug', 'Sep'])
+fig_industry.show()
+```
+:::
