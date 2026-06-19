@@ -15,6 +15,8 @@ website:
         text: "Exploratory Analysis"
       - href: skill_gap_analysis.qmd
         text: "Skill Gap Analysis"
+      - href: salary_analysis.qmd
+        text: "Salary Analysis"
       - href: ml_methods.qmd
         text: "Predictive Modeling"
       - href: career_plan.qmd
