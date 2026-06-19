@@ -706,7 +706,8 @@ fig_ai_salary.update_layout(
 
 fig_ai_salary.show()
 ```
-AI-related roles command higher salaries than non-AI roles, with Q1, median and Q3 quartile appearing elevated.
+Insight: AI-related roles command higher salaries than non-AI roles, as seen from the elevated Q1, median and Q3 quartiles. 
+However, the maximum salary an AI-related role can bag is lower than a non-AI role.
 
 ## What regions offer the highest-paying jobs in AI-related and traditional careers?
 ```{python}
@@ -811,6 +812,10 @@ fig_ai_premium.update_layout(
 #fig_ai_premium.show()
 
 ```
+Insight: South Dakota and New Mexico have the highest salary premiums for AI-related roles, paying up to 42% more on average for AI roles than non-AI roles.
+On the other side, Kentucky penalizes AI-related roles, paying them ~4% lesser on average than non-AI roles.
+
+
 ## Are remote jobs better paying than in-office roles?
 ```{python}
 remote_salary = spark.sql("""
@@ -843,6 +848,10 @@ fig_remote.update_layout(
 
 #fig_remote.show()
 ```
+Insight: Remote jobs pay higher than non-remote and hybrid roles as seen from the highest Q1, median and Q3 values for remote roles. Non-remote and hybrid
+roles have very similar salary distributions, with hybrid role salaries showing more spread.
+
+
 ## What industries saw the biggest wage growth in 2024?
 ```{python}
 industry_salary_monthly = spark.sql("""
@@ -923,15 +932,14 @@ fig_ai_salary.show()
 #| label: fig-ai-premium
 #| fig-cap: "AI Premium (%) by State"
 
-# Fix the map scope so it's not a tiny world map
 fig_ai_premium.update_geos(scope='usa')
 fig_ai_premium.update_layout(
     margin=dict(l=20, r=20, t=40, b=20),
     height = 400,
     coloraxis_colorbar=dict(
-        len=0.6,           # Shrinks the vertical height (60% of chart height instead of 100%)
-        thickness=15,      # Makes the bar a bit slimmer
-        yanchor="center",  # Center vertically relative to the map
+        len=0.6,           
+        thickness=15,      
+        yanchor="middle",  
         y=0.5,
         title=dict(font=dict(size=11)),
         tickfont=dict(size=10)
