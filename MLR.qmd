@@ -20,6 +20,7 @@ execute:
 
 # Use Multiple Linear Regression to model salary based on location, job title, skills, remote type, employment type, minimum experience, and education level.
 
+### Load data
 ```{python}
 #| echo: false
 #| warning: false
@@ -43,6 +44,7 @@ spark = SparkSession.builder \
     .getOrCreate()
 
 spark.catalog.clearCache()
+spark.sparkContext.setLogLevel("ERROR")
 
 # Load prepared model-ready dataset from data_cleaning.qmd
 df_model_base = spark.read.parquet("data/prepared/salary_regression_data.parquet")
