@@ -1,6 +1,6 @@
 ---
 title: "Salary & Compensation Trends"
-author: "Nutchanon Chaiyaratana"
+author: "Nutchanon Chaiyaratana and Afreen Alam"
 date: today
 format:
   html:
@@ -8,6 +8,8 @@ format:
     toc: true
     toc-depth: 2
     embed-resources: true
+    code-fold: true
+    code-summary: "Show code"
 date-modified: today
 date-format: long
 execute:
@@ -34,9 +36,8 @@ Because salary information is not available for every job posting, this analysis
 #| warning: false
 #| message: false
 
-# load data + create tables here
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, monotonically_increasing_id
+from pyspark.sql.functions import col, monotonically_increasing_id, when
 
 spark = SparkSession.builder \
     .config("spark.driver.host", "localhost") \
@@ -45,22 +46,13 @@ spark = SparkSession.builder \
 
 spark.catalog.clearCache()
 
-df = spark.read.option("header", "true") \
-    .option("inferSchema", "true") \
-    .option("multiLine", "true") \
-    .option("escape", "\"") \
-    .csv("data/lightcast_job_postings.csv")
+# Load cleaned dataset from data_cleaning.qmd
+df_clean = spark.read.parquet("data/cleaned/lightcast_cleaned.parquet")
+df_clean.createOrReplaceTempView("raw_jobs_clean")
 
-df.createOrReplaceTempView("raw_jobs")
-# Basic cleaning: remove records without a job posting ID
-
-df_clean = df.filter(col("ID").isNotNull())
-
-df_clean.createOrReplaceTempView("raw_jobs")
-
-print("Original rows:", df.count())
-
-print("Rows after removing missing ID:", df_clean.count())
+print("Cleaned rows:", df_clean.count())
+print("Cleaned columns:", len(df_clean.columns))
+print("Has imputed salary column:", "ANALYSIS_SALARY_INDUSTRY_IMPUTED" in df_clean.columns)
 
 # companies table
 companies_df = df_clean.select(
@@ -150,8 +142,8 @@ occupations_df.createOrReplaceTempView("occupations")
 job_with_industry = df_clean.join(
     industries_df,
     (
-        (df["NAICS_2022_6"] == industries_df["naics_2022_6"]) &
-        (df["NAICS_2022_6_NAME"] == industries_df["naics_2022_6_name"])
+        (df_clean["NAICS_2022_6"] == industries_df["naics_2022_6"]) &
+        (df_clean["NAICS_2022_6_NAME"] == industries_df["naics_2022_6_name"])
     ),
     "left"
 )
@@ -193,16 +185,21 @@ job_postings_df = job_with_keys.select(
     job_with_keys["BODY"].alias("body"),
     job_with_keys["MIN_YEARS_EXPERIENCE"].alias("min_years_experience"),
     job_with_keys["MAX_YEARS_EXPERIENCE"].alias("max_years_experience"),
-    job_with_keys["SALARY"].alias("salary"),
+    job_with_keys["SALARY"].alias("original_salary"),
     job_with_keys["SALARY_FROM"].alias("salary_from"),
     job_with_keys["SALARY_TO"].alias("salary_to"),
+    job_with_keys["ANALYSIS_SALARY"].alias("observed_analysis_salary"),
+    job_with_keys["ANALYSIS_SALARY_INDUSTRY_IMPUTED"].alias("salary"),
+    job_with_keys["SALARY_IMPUTATION_STATUS"].alias("salary_imputation_status"),
     col("location_id"),
+    job_with_keys["POSTED_DATE"].alias("posted_date"),
     job_with_keys["POSTED"].alias("posted"),
     job_with_keys["EXPIRED"].alias("expired"),
     job_with_keys["DURATION"].alias("duration")
 ).filter(
     col("id").isNotNull()
 ).dropDuplicates(["id"])
+
 job_postings_df.createOrReplaceTempView("job_postings")
 ```
 ## Skill Table
@@ -448,8 +445,10 @@ job_postings_preview = job_postings_df.select(
     "industry_id",
     "occupation_id",
     "location_id",
+    "observed_analysis_salary",
     "salary",
-    "posted"
+    "salary_imputation_status",
+    "posted_date"
 ).limit(5).toPandas()
 
 style_table(job_postings_preview)
@@ -665,31 +664,317 @@ style_table(ai_vs_non_ai_salary_pd, {
     "job_share": "{:.1%}"
 })
 ```
+AI-related postings are identified using both Lightcast skill tags and AI-related keywords in job titles and descriptions. This combined classification reduces the chance of missing AI-related jobs that are not tagged with AI skills directly. The comparison uses only postings with valid salary values.
 
+## How do salaries differ across AI vs. non-AI careers?
 ```{python}
-#| label: fig-ai-vs-non-ai-salary
-#| fig-cap: "Average Salary: AI-Related vs. Non-AI Job Postings"
-#| fig-width: 7
-#| fig-height: 4
 
-import seaborn as sns
-import matplotlib.pyplot as plt
+salary_distribution = spark.sql("""
+SELECT
+    CASE
+        WHEN a.job_id IS NOT NULL THEN 'AI-related'
+        ELSE 'Non-AI'
+    END AS career_type,
+    CAST(j.salary AS DOUBLE) AS salary
+FROM job_postings j
+LEFT JOIN ai_job_ids a
+    ON j.id = a.job_id
+WHERE
+    j.salary IS NOT NULL
+    AND CAST(j.salary AS DOUBLE) > 0
+""")
 
-fig, ax = plt.subplots(figsize=(7, 4))
+salary_distribution_pd = salary_distribution.toPandas()
 
-sns.barplot(
-    data=ai_vs_non_ai_salary_pd,
+import plotly.express as px
+
+fig_ai_salary = px.box(
+    salary_distribution_pd,
     x="career_type",
-    y="avg_salary",
-    ax=ax
+    y="salary",
+    color="career_type",
+    points=False,
+    title="Salary Distribution: AI vs Non-AI Careers"
 )
 
-ax.set_title("Average Salary: AI-Related vs. Non-AI Job Postings")
-ax.set_xlabel("Career Type")
-ax.set_ylabel("Average Salary")
+fig_ai_salary.update_layout(
+    template="plotly_white",
+    showlegend=False,
+    yaxis_title="Salary ($)",
+    xaxis_title=""
+)
 
-plt.tight_layout()
-plt.show()
+fig_ai_salary.show()
+```
+Insight: AI-related roles command higher salaries than non-AI roles, as seen from the elevated Q1, median and Q3 quartiles. 
+However, the maximum salary an AI-related role can bag is lower than a non-AI role.
+
+## What regions offer the highest-paying jobs in AI-related and traditional careers?
+```{python}
+jobs_with_ai = (
+    job_postings_df.alias("j")
+    .join(
+        ai_job_ids.alias("a"),
+        col("j.id") == col("a.job_id"),
+        "left"
+    )
+    .withColumn(
+        "career_type",
+        when(col("a.job_id").isNotNull(), "AI-related")
+        .otherwise("Non-AI")
+    )
+)
+jobs_with_ai.createOrReplaceTempView("jobs_with_ai")
+
+state_salary = spark.sql("""
+SELECT
+    l.state_name,
+    j.career_type,
+    AVG(CAST(j.salary AS DOUBLE)) AS avg_salary
+FROM jobs_with_ai j
+JOIN locations l
+    ON j.location_id = l.location_id
+WHERE
+    j.salary IS NOT NULL
+    AND CAST(j.salary AS DOUBLE) > 0
+GROUP BY
+    l.state_name,
+    j.career_type
+""")
+
+state_salary_pd = state_salary.toPandas()
+
+pivot_df = (
+    state_salary_pd
+    .pivot(
+        index="state_name",
+        columns="career_type",
+        values="avg_salary"
+    )
+    .reset_index()
+)
+
+pivot_df["premium_dollars"] = (
+    pivot_df["AI-related"] -
+    pivot_df["Non-AI"]
+)
+
+pivot_df["premium_pct"] = (
+    (pivot_df["AI-related"] -
+     pivot_df["Non-AI"])
+    / pivot_df["Non-AI"]
+) * 100
+
+# Add state abbreviation column for Plotly choropleth map
+state_abbrev = {
+    "Alabama": "AL", "Alaska": "AK", "Arizona": "AZ", "Arkansas": "AR",
+    "California": "CA", "Colorado": "CO", "Connecticut": "CT", "Delaware": "DE",
+    "Florida": "FL", "Georgia": "GA", "Hawaii": "HI", "Idaho": "ID",
+    "Illinois": "IL", "Indiana": "IN", "Iowa": "IA", "Kansas": "KS",
+    "Kentucky": "KY", "Louisiana": "LA", "Maine": "ME", "Maryland": "MD",
+    "Massachusetts": "MA", "Michigan": "MI", "Minnesota": "MN", "Mississippi": "MS",
+    "Missouri": "MO", "Montana": "MT", "Nebraska": "NE", "Nevada": "NV",
+    "New Hampshire": "NH", "New Jersey": "NJ", "New Mexico": "NM", "New York": "NY",
+    "North Carolina": "NC", "North Dakota": "ND", "Ohio": "OH", "Oklahoma": "OK",
+    "Oregon": "OR", "Pennsylvania": "PA", "Rhode Island": "RI",
+    "South Carolina": "SC", "South Dakota": "SD", "Tennessee": "TN", "Texas": "TX",
+    "Utah": "UT", "Vermont": "VT", "Virginia": "VA", "Washington": "WA",
+    "West Virginia": "WV", "Wisconsin": "WI", "Wyoming": "WY",
+    "District of Columbia": "DC"
+}
+
+pivot_df["state_code"] = pivot_df["state_name"].map(state_abbrev)
+pivot_df = pivot_df.dropna(subset=["state_code"])
+
+fig_ai_premium = px.choropleth(
+    pivot_df,
+    locations="state_code",
+    locationmode="USA-states",
+    color="premium_pct",
+    scope="usa",
+    hover_name="state_name",
+    hover_data={
+        "AI-related": ":,.0f",
+        "Non-AI": ":,.0f",
+        "premium_dollars": ":,.0f",
+        "premium_pct": ":.1f",
+        "state_code": False
+    },
+    color_continuous_scale="RdYlGn",
+    title="AI Salary Premium (%) by State"
+)
+
+fig_ai_premium.update_layout(
+    template="plotly_white",
+    height=550
+)
+
+#fig_ai_premium.show()
+
+```
+Insight: South Dakota and New Mexico have the highest salary premiums for AI-related roles, paying up to 42% more on average for AI roles than non-AI roles.
+On the other side, Kentucky penalizes AI-related roles, paying them ~4% lesser on average than non-AI roles.
+
+
+## Are remote jobs better paying than in-office roles?
+```{python}
+remote_salary = spark.sql("""
+SELECT
+    COALESCE(remote_type_name,'Unknown') AS remote_type,
+    CAST(salary AS DOUBLE) AS salary
+FROM job_postings
+WHERE
+    salary IS NOT NULL
+    AND CAST(salary AS DOUBLE) > 0
+    AND COALESCE(remote_type_name,'Unknown') != 'Unknown'
+""")
+
+remote_salary_pd = remote_salary.toPandas()
+
+fig_remote = px.box(
+    remote_salary_pd,
+    x="remote_type",
+    y="salary",
+    color="remote_type",
+    title="Salary by Remote Work Arrangement"
+)
+
+fig_remote.update_layout(
+    template="plotly_white",
+    showlegend=False,
+    yaxis_title="Salary ($)",
+    xaxis_title=""
+)
+
+#fig_remote.show()
+```
+Insight: Remote jobs pay higher than non-remote and hybrid roles as seen from the highest Q1, median and Q3 values for remote roles. Non-remote and hybrid
+roles have very similar salary distributions, with hybrid role salaries showing more spread.
+
+
+## What industries saw the biggest wage growth in 2024?
+```{python}
+industry_salary_monthly = spark.sql("""
+SELECT
+    i.naics_2022_6_name AS industry,
+    MONTH(j.posted_date) AS month_num,
+    DATE_FORMAT(j.posted_date, 'MMM') AS month,
+    ROUND(
+        AVG(CAST(j.salary AS DOUBLE)),0) AS avg_salary
+FROM job_postings j
+LEFT JOIN industries i
+    ON j.industry_id = i.industry_id
+WHERE
+    YEAR(j.posted_date) = 2024
+    AND j.salary IS NOT NULL
+GROUP BY
+    i.naics_2022_6_name,
+    MONTH(j.posted_date), DATE_FORMAT(j.posted_date, 'MMM')
+ORDER BY industry, MONTH(j.posted_date)
+""")
+
+industry_salary_monthly_pd = industry_salary_monthly.toPandas()
+
+top_industries = (
+    industry_salary_monthly_pd
+    .groupby("industry")["avg_salary"]
+    .mean()
+    .nlargest(12)
+    .index
+)
+
+plot_df = industry_salary_monthly_pd[
+    industry_salary_monthly_pd["industry"].isin(top_industries)
+]
+month_order = [
+    "May", "Jun",
+    "Jul", "Aug", "Sep"
+]
+
+fig_industry = px.line(
+    plot_df,
+    x="month",
+    y="avg_salary",
+    color="industry",
+    markers=True,
+    category_orders={"month": month_order},
+    title="Monthly Salary Trends by Industry (2024)"
+)
+
+fig_industry.update_layout(
+    template="plotly_white",
+    xaxis_title="Month",
+    yaxis_title="Average Salary"
+)
+
+#fig_industry.show()
 ```
 
-AI-related postings are identified using both Lightcast skill tags and AI-related keywords in job titles and descriptions. This combined classification reduces the chance of missing AI-related jobs that are not tagged with AI skills directly. The comparison uses only postings with valid salary values.
+## Salary & Compensation Trends Dashboard
+
+A visual summary comparing AI and traditional compensation packages across states, work arrangements, and industries.
+
+::: {#dashboard-layout layout="[[50, 50], [50, 50]]"}
+
+```{python}
+#| echo: false
+#| label: fig-ai-salary
+#| fig-cap: "AI vs Non-AI Salaries"
+
+fig_ai_salary.update_layout(
+    margin=dict(l=20, r=20, t=40, b=20),
+    height=400
+)
+fig_ai_salary.show()
+```
+```{python}
+#| echo: false
+#| label: fig-ai-premium
+#| fig-cap: "AI Premium (%) by State"
+
+fig_ai_premium.update_geos(scope='usa')
+fig_ai_premium.update_layout(
+    margin=dict(l=20, r=20, t=40, b=20),
+    height = 400,
+    coloraxis_colorbar=dict(
+        len=0.6,           
+        thickness=15,      
+        yanchor="middle",  
+        y=0.5,
+        title=dict(font=dict(size=11)),
+        tickfont=dict(size=10)
+    )
+
+)
+fig_ai_premium.show()
+```
+```{python}
+#| echo: false
+#| label: fig-remote
+#| fig-cap: "Salary Distribution By Work-Arrangement"
+
+fig_remote.update_layout(margin=dict(l=20, r=20, t=40, b=20))
+fig_remote.show()
+```
+
+```{python}
+#| echo: false
+#| label: fig-industry
+#| fig-cap: "Salary Growth By Industry"
+
+fig_industry.update_layout(
+    legend=dict(
+        orientation="h", 
+        yanchor="top", 
+        y=-0.35,              # Pushes it further below the "Month" label
+        xanchor="center", 
+        x=0.5,
+        font=dict(size=9)     # Slightly smaller font keeps multi-row text compact
+    ),
+    margin=dict(l=20, r=20, t=40, b=120),  
+    height=400
+)
+fig_industry.update_xaxes(categoryorder='array', categoryarray=['May', 'Jun', 'Jul', 'Aug', 'Sep'])
+fig_industry.show()
+```
+:::
