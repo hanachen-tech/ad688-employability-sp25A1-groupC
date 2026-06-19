@@ -1,0 +1,168 @@
+---
+title: "ML Methods - Random Forest"
+format: html
+execute:
+  warning: false
+  message: false
+---
+
+# 2.3 Salary and Compensation Trends — Random Forest
+
+```{python}
+#| echo: false
+#| warning: false
+#| message: false
+
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, when, trim
+from pyspark.sql.functions import count as spark_count, explode, split
+from pyspark.ml.feature import StringIndexer, OneHotEncoder, VectorAssembler
+from pyspark.ml.regression import RandomForestRegressor
+from pyspark.ml import Pipeline
+from pyspark.ml.evaluation import RegressionEvaluator
+from IPython.display import display
+from pyspark.sql.functions import regexp_replace
+import pandas as pd
+
+spark = SparkSession.builder \
+    .config("spark.driver.host", "localhost") \
+    .config("spark.driver.memory", "4g") \
+    .config("spark.executor.memory", "4g") \
+    .appName("SalaryRF") \
+    .getOrCreate()
+
+spark.sparkContext.setLogLevel("ERROR")
+spark.catalog.clearCache()
+
+df_clean = spark.read.parquet("data/cleaned/lightcast_cleaned.parquet")
+
+df_salary = df_clean.filter(
+    col("SALARY").isNotNull() & (col("SALARY") > 0) & (col("SALARY") <= 500000)
+).withColumn("SKILLS_NAME", regexp_replace(col("SKILLS_NAME"), r'[\n\r\"]', "")).cache()
+
+top_titles = [r["TITLE_CLEAN"] for r in
+    df_salary.groupBy("TITLE_CLEAN").agg(spark_count("*").alias("cnt"))
+    .orderBy(col("cnt").desc()).limit(30).collect()]
+
+top_skills = [r["skill"] for r in
+    df_salary.select(explode(split(col("SKILLS_NAME"), ",")).alias("skill"))
+    .select(trim(col("skill")).alias("skill"))
+    .filter(col("skill") != "")
+    .groupBy("skill").agg(spark_count("*").alias("cnt"))
+    .orderBy(col("cnt").desc()).limit(20).collect()]
+
+min_exp_median = df_salary.approxQuantile("MIN_YEARS_EXPERIENCE", [0.5], 0.01)[0]
+
+df_model = df_salary \
+    .withColumn("title_grouped",
+        when(col("TITLE_CLEAN").isin(top_titles), col("TITLE_CLEAN")).otherwise("Other")) \
+    .withColumn("min_exp",
+        when(col("MIN_YEARS_EXPERIENCE").isNotNull(), col("MIN_YEARS_EXPERIENCE"))
+        .otherwise(min_exp_median))
+
+for skill in top_skills:
+    col_name = "skill_" + skill.lower().replace(" ", "_").replace("/", "_")
+    df_model = df_model.withColumn(col_name,
+        when(col("SKILLS_NAME").contains(skill), 1.0).otherwise(0.0))
+
+skill_cols = ["skill_" + s.lower().replace(" ", "_").replace("/", "_") for s in top_skills]
+
+df_model = df_model.select(
+    ["SALARY", "title_grouped", "STATE_NAME",
+     "REMOTE_TYPE_NAME", "EMPLOYMENT_TYPE_NAME", "min_exp"] + skill_cols
+).dropna().cache()
+
+print("Model rows:", df_model.count())
+
+title_indexer  = StringIndexer(inputCol="title_grouped",        outputCol="title_idx",  handleInvalid="keep")
+title_encoder  = OneHotEncoder(inputCol="title_idx",            outputCol="title_vec")
+state_indexer  = StringIndexer(inputCol="STATE_NAME",           outputCol="state_idx",  handleInvalid="keep")
+state_encoder  = OneHotEncoder(inputCol="state_idx",            outputCol="state_vec")
+remote_indexer = StringIndexer(inputCol="REMOTE_TYPE_NAME",     outputCol="remote_idx", handleInvalid="keep")
+remote_encoder = OneHotEncoder(inputCol="remote_idx",           outputCol="remote_vec")
+employ_indexer = StringIndexer(inputCol="EMPLOYMENT_TYPE_NAME", outputCol="employ_idx", handleInvalid="keep")
+employ_encoder = OneHotEncoder(inputCol="employ_idx",           outputCol="employ_vec")
+
+assembler = VectorAssembler(
+    inputCols=["title_vec", "state_vec", "remote_vec", "employ_vec", "min_exp"] + skill_cols,
+    outputCol="features"
+)
+
+rf = RandomForestRegressor(
+    featuresCol="features",
+    labelCol="SALARY",
+    numTrees=100,
+    maxDepth=10,
+    seed=42
+)
+
+pipeline = Pipeline(stages=[
+    title_indexer, title_encoder,
+    state_indexer, state_encoder,
+    remote_indexer, remote_encoder,
+    employ_indexer, employ_encoder,
+    assembler, rf
+])
+
+train, test = df_model.randomSplit([0.8, 0.2], seed=42)
+model = pipeline.fit(train)
+predictions = model.transform(test)
+
+rf_model = model.stages[-1]
+importances = rf_model.featureImportances.toArray()
+
+title_cats  = list(model.stages[0].labels)
+state_cats  = list(model.stages[2].labels)
+remote_cats = list(model.stages[4].labels)
+employ_cats = list(model.stages[6].labels)
+
+feature_names = (
+    title_cats  + ["title_unseen"]  +
+    state_cats  + ["state_unseen"]  +
+    remote_cats + ["remote_unseen"] +
+    employ_cats + ["employ_unseen"] +
+    ["min_exp"] +
+    skill_cols
+)[:len(importances)]
+
+r2   = RegressionEvaluator(labelCol="SALARY", predictionCol="prediction", metricName="r2").evaluate(predictions)
+rmse = RegressionEvaluator(labelCol="SALARY", predictionCol="prediction", metricName="rmse").evaluate(predictions)
+mae  = RegressionEvaluator(labelCol="SALARY", predictionCol="prediction", metricName="mae").evaluate(predictions)
+
+n = predictions.count()
+p = len(importances)
+adj_r2 = 1 - (1 - r2) * (n - 1) / (n - p - 1)
+
+display(pd.DataFrame({
+    "Metric": ["R²", "Adjusted R²", "RMSE", "MAE"],
+    "Value": [round(r2, 4), round(adj_r2, 4), round(rmse, 2), round(mae, 2)]
+}))
+
+importance_df = pd.DataFrame({
+    "Feature": feature_names,
+    "Importance": importances
+}).sort_values("Importance", ascending=False)
+
+importance_df = importance_df[~importance_df["Feature"].str.contains("unseen")]
+
+print("\n=== Feature Importance ===")
+display(importance_df)
+```
+
+## Model Performance
+
+The Random Forest model achieved an R² of 0.526 and Adjusted R² of 0.517, explaining approximately 52% of salary variation. Compared to the Multiple Linear Regression model (R² = 0.378), Random Forest improved explanatory power by nearly 15 percentage points. The lower RMSE ($30,791) and MAE ($22,192) also confirm better prediction accuracy. The minimal gap between R² and Adjusted R² indicates that the features included in the model contribute meaningfully rather than inflating performance artificially.
+
+## Feature Importance
+
+Unlike MLR which outputs coefficients, Random Forest provides feature importance scores that indicate how much each variable contributes to salary prediction.
+
+The most influential variable is **employment type (Full-time > 32 hours)**, with an importance score of 0.360 — far exceeding all other features. This suggests that whether a job is full-time or part-time has the strongest impact on salary, more so than job title or skills.
+
+Among job titles, **Data Engineer Analytics** stands out as the highest-paying role (importance: 0.059), consistent with strong market demand for data engineering skills. Among skills, **communication** (0.085) and **planning** (0.076) rank highest, suggesting that soft skills play a meaningful role in salary differentiation alongside technical abilities.
+
+Geographic location (state-level) shows relatively low importance across all states, indicating that location alone is not a strong salary predictor once job title, skills, and employment type are controlled for.
+
+## Model Limitations
+
+Despite the improvement over MLR, the model still leaves approximately 48% of salary variance unexplained. Key factors not available in the dataset — such as years of experience, education level, company size, and individual negotiation — likely account for the remaining variance. Future work could incorporate these variables to further improve predictive accuracy.
