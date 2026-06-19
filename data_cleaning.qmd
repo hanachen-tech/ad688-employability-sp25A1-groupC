@@ -220,6 +220,16 @@ df_clean = df_clean.withColumn("REMOTE_TYPE_NAME", trim(col("REMOTE_TYPE_NAME"))
 if "EDUCATION_LEVELS_NAME" in df_clean.columns:
     df_clean = df_clean.withColumn(
         "EDUCATION_LEVELS_NAME",
+        regexp_replace(col("EDUCATION_LEVELS_NAME"), r'[\[\]"]', "")
+    )
+
+    df_clean = df_clean.withColumn(
+        "EDUCATION_LEVELS_NAME",
+        regexp_replace(col("EDUCATION_LEVELS_NAME"), r"\s*,\s*", ", ")
+    )
+
+    df_clean = df_clean.withColumn(
+        "EDUCATION_LEVELS_NAME",
         trim(
             regexp_replace(
                 regexp_replace(col("EDUCATION_LEVELS_NAME"), r"[\n\r]", " "),
@@ -229,13 +239,15 @@ if "EDUCATION_LEVELS_NAME" in df_clean.columns:
         )
     )
 
-df_clean = df_clean.withColumn(
-    "REMOTE_TYPE_NAME",
-    when(
-        col("REMOTE_TYPE_NAME").isNull() | (col("REMOTE_TYPE_NAME") == "[None]"),
-        "Unknown"
-    ).otherwise(col("REMOTE_TYPE_NAME"))
-)
+    df_clean = df_clean.withColumn(
+        "EDUCATION_LEVELS_NAME",
+        when(
+            col("EDUCATION_LEVELS_NAME").isNull() |
+            (col("EDUCATION_LEVELS_NAME") == "") |
+            (col("EDUCATION_LEVELS_NAME") == "None"),
+            "Unknown"
+        ).otherwise(col("EDUCATION_LEVELS_NAME"))
+    )
 
 df_clean = df_clean.withColumn("SALARY", col("SALARY").cast("double"))
 df_clean = df_clean.withColumn("SALARY_FROM", col("SALARY_FROM").cast("double"))
@@ -535,7 +547,7 @@ display(style_table(final_salary_availability_after_impute, {
 }))
 ```
 
-**Result:** After applying qualified industry-median imputation, the usable salary sample increases from 32,394 postings to 39,244 postings. A total of 33,232 postings remain missing salary after imputation. The main analysis should use `ANALYSIS_SALARY`, while `ANALYSIS_SALARY_INDUSTRY_IMPUTED` should be used only for sensitivity analysis.
+**Result:** After applying qualified industry-median imputation, the usable salary sample increases from 32,394 postings to 39,244 postings. A total of 33,232 postings remain missing salary after imputation. The final salary analysis and modeling use ANALYSIS_SALARY_INDUSTRY_IMPUTED as the primary salary variable, while SALARY_IMPUTATION_STATUS is retained to distinguish observed and imputed salary records.
 
 ## 11. Investigate Remaining Missing Salary After Imputation
 
@@ -644,4 +656,442 @@ os.makedirs("data/cleaned", exist_ok=True)
 df_clean.write.mode("overwrite").parquet("data/cleaned/lightcast_cleaned.parquet")
 
 print("Saved cleaned data to: data/cleaned/lightcast_cleaned.parquet")
+```
+
+## 13. Create Prepared Tables for Analysis and Modeling
+
+This section creates reusable prepared tables from the cleaned dataset. These tables are saved as Parquet files so that downstream pages such as salary analysis, exploratory analysis, regression, and classification can load them directly without rebuilding joins and skill tables each time.
+
+#| echo: true
+#| warning: false
+#| message: false
+```{python}
+from pyspark.sql.functions import (
+    col,
+    split,
+    explode,
+    trim,
+    lit,
+    regexp_replace,
+    monotonically_increasing_id,
+    lower,
+    max as spark_max,
+    when
+)
+
+os.makedirs("data/prepared", exist_ok=True)
+
+# ----------------------------
+# Companies table
+# ----------------------------
+companies_df = df_clean.select(
+    col("COMPANY").alias("company_id"),
+    col("COMPANY").alias("company"),
+    col("COMPANY_NAME").alias("company_name"),
+    col("COMPANY_RAW").alias("company_raw"),
+    col("COMPANY_IS_STAFFING").alias("company_is_staffing")
+).dropDuplicates(["company_id"])
+
+companies_df.createOrReplaceTempView("companies")
+
+
+# ----------------------------
+# Industries table
+# ----------------------------
+industries_df = df_clean.select(
+    col("NAICS_2022_6").alias("naics_2022_6"),
+    col("NAICS_2022_6_NAME").alias("naics_2022_6_name")
+).dropDuplicates()
+
+industries_df = industries_df.withColumn(
+    "industry_id",
+    monotonically_increasing_id()
+)
+
+industries_df = industries_df.select(
+    "industry_id",
+    "naics_2022_6",
+    "naics_2022_6_name"
+)
+
+industries_df.createOrReplaceTempView("industries")
+
+
+# ----------------------------
+# Locations table
+# ----------------------------
+locations_df = df_clean.select(
+    col("LOCATION").alias("location"),
+    col("CITY_NAME").alias("city_name"),
+    col("STATE_NAME").alias("state_name"),
+    col("COUNTY_NAME").alias("county_name"),
+    col("MSA").alias("msa"),
+    col("MSA_NAME").alias("msa_name")
+).dropDuplicates()
+
+locations_df = locations_df.withColumn(
+    "location_id",
+    monotonically_increasing_id()
+)
+
+locations_df = locations_df.select(
+    "location_id",
+    "location",
+    "city_name",
+    "state_name",
+    "county_name",
+    "msa",
+    "msa_name"
+)
+
+locations_df.createOrReplaceTempView("locations")
+
+
+# ----------------------------
+# Occupations table
+# ----------------------------
+occupations_df = df_clean.select(
+    col("SOC_5").alias("soc_5"),
+    col("SOC_5_NAME").alias("soc_5_name"),
+    col("LOT_SPECIALIZED_OCCUPATION").alias("specialized_occupation"),
+    col("LOT_SPECIALIZED_OCCUPATION_NAME").alias("specialized_occupation_name"),
+    col("LOT_OCCUPATION_GROUP").alias("occupation_group"),
+    col("LOT_OCCUPATION_GROUP_NAME").alias("occupation_group_name")
+).dropDuplicates()
+
+occupations_df = occupations_df.withColumn(
+    "occupation_id",
+    monotonically_increasing_id()
+)
+
+occupations_df = occupations_df.select(
+    "occupation_id",
+    "soc_5",
+    "soc_5_name",
+    "specialized_occupation",
+    "specialized_occupation_name",
+    "occupation_group",
+    "occupation_group_name"
+)
+
+occupations_df.createOrReplaceTempView("occupations")
+
+
+# ----------------------------
+# Job postings table
+# ----------------------------
+job_with_industry = df_clean.join(
+    industries_df,
+    (
+        (df_clean["NAICS_2022_6"] == industries_df["naics_2022_6"]) &
+        (df_clean["NAICS_2022_6_NAME"] == industries_df["naics_2022_6_name"])
+    ),
+    "left"
+)
+
+job_with_location = job_with_industry.join(
+    locations_df,
+    (
+        (job_with_industry["LOCATION"] == locations_df["location"]) &
+        (job_with_industry["CITY_NAME"] == locations_df["city_name"]) &
+        (job_with_industry["STATE_NAME"] == locations_df["state_name"]) &
+        (job_with_industry["COUNTY_NAME"] == locations_df["county_name"]) &
+        (job_with_industry["MSA"] == locations_df["msa"]) &
+        (job_with_industry["MSA_NAME"] == locations_df["msa_name"])
+    ),
+    "left"
+)
+
+job_with_keys = job_with_location.join(
+    occupations_df,
+    (
+        (job_with_location["SOC_5"] == occupations_df["soc_5"]) &
+        (job_with_location["SOC_5_NAME"] == occupations_df["soc_5_name"]) &
+        (job_with_location["LOT_SPECIALIZED_OCCUPATION"] == occupations_df["specialized_occupation"]) &
+        (job_with_location["LOT_SPECIALIZED_OCCUPATION_NAME"] == occupations_df["specialized_occupation_name"]) &
+        (job_with_location["LOT_OCCUPATION_GROUP"] == occupations_df["occupation_group"]) &
+        (job_with_location["LOT_OCCUPATION_GROUP_NAME"] == occupations_df["occupation_group_name"])
+    ),
+    "left"
+)
+
+job_postings_df = job_with_keys.select(
+    job_with_keys["ID"].alias("id"),
+    job_with_keys["TITLE_CLEAN"].alias("title_clean"),
+    job_with_keys["COMPANY"].alias("company_id"),
+    col("industry_id"),
+    col("occupation_id"),
+    job_with_keys["EMPLOYMENT_TYPE_NAME"].alias("employment_type_name"),
+    job_with_keys["REMOTE_TYPE_NAME"].alias("remote_type_name"),
+    job_with_keys["BODY"].alias("body"),
+    job_with_keys["MIN_YEARS_EXPERIENCE"].cast("double").alias("min_years_experience"),
+    job_with_keys["MAX_YEARS_EXPERIENCE"].cast("double").alias("max_years_experience"),
+    job_with_keys["SALARY"].alias("original_salary"),
+    job_with_keys["SALARY_FROM"].alias("salary_from"),
+    job_with_keys["SALARY_TO"].alias("salary_to"),
+    job_with_keys["ANALYSIS_SALARY"].alias("observed_analysis_salary"),
+    job_with_keys["ANALYSIS_SALARY_INDUSTRY_IMPUTED"].cast("double").alias("salary"),
+    job_with_keys["SALARY_IMPUTATION_STATUS"].alias("salary_imputation_status"),
+    col("location_id"),
+    job_with_keys["POSTED_DATE"].alias("posted_date"),
+    job_with_keys["POSTED"].alias("posted"),
+    job_with_keys["EXPIRED"].alias("expired"),
+    job_with_keys["DURATION"].alias("duration")
+).filter(
+    col("id").isNotNull()
+).dropDuplicates(["id"])
+
+job_postings_df.createOrReplaceTempView("job_postings")
+
+
+# ----------------------------
+# Skills table
+# ----------------------------
+def create_skill_matches(column_name, skill_type):
+    return df_clean.select(
+        col("ID").alias("job_id"),
+        explode(split(col(column_name), ",")).alias("skill_name")
+    ).withColumn(
+        "skill_name",
+        regexp_replace(col("skill_name"), r'[\[\]"]', "")
+    ).withColumn(
+        "skill_name",
+        trim(col("skill_name"))
+    ).withColumn(
+        "skill_type",
+        lit(skill_type)
+    ).filter(
+        col("skill_name").isNotNull() & (col("skill_name") != "")
+    )
+
+specialized_skill_matches = create_skill_matches("SPECIALIZED_SKILLS_NAME", "specialized")
+common_skill_matches = create_skill_matches("COMMON_SKILLS_NAME", "common")
+software_skill_matches = create_skill_matches("SOFTWARE_SKILLS_NAME", "software")
+certification_matches = create_skill_matches("CERTIFICATIONS_NAME", "certification")
+
+job_skill_matches_raw = specialized_skill_matches.unionByName(
+    common_skill_matches
+).unionByName(
+    software_skill_matches
+).unionByName(
+    certification_matches
+).dropDuplicates(["job_id", "skill_name", "skill_type"])
+
+skills_df = job_skill_matches_raw.select(
+    "skill_name",
+    "skill_type"
+).dropDuplicates()
+
+skills_df = skills_df.withColumn(
+    "skill_id",
+    monotonically_increasing_id()
+)
+
+skills_df = skills_df.select(
+    "skill_id",
+    "skill_name",
+    "skill_type"
+)
+
+skills_df.createOrReplaceTempView("skills")
+
+job_skill_matches_df = job_skill_matches_raw.join(
+    skills_df,
+    on=["skill_name", "skill_type"],
+    how="left"
+).select(
+    "job_id",
+    "skill_id",
+    "skill_name",
+    "skill_type"
+)
+
+job_skill_matches_df.createOrReplaceTempView("job_skill_matches")
+
+# Create skill-count features for modeling
+from pyspark.sql.functions import sum as spark_sum
+
+skill_count_features_df = (
+    job_skill_matches_df
+    .groupBy("job_id")
+    .agg(
+        spark_sum(when(col("skill_type") == "common", 1).otherwise(0)).alias("common_skill_count"),
+        spark_sum(when(col("skill_type") == "specialized", 1).otherwise(0)).alias("specialized_skill_count"),
+        spark_sum(when(col("skill_type") == "software", 1).otherwise(0)).alias("software_skill_count")
+    )
+)
+
+skill_count_features_df.createOrReplaceTempView("skill_count_features")
+
+# ----------------------------
+# AI-related job IDs
+# ----------------------------
+ai_job_ids = spark.sql("""
+SELECT DISTINCT
+    j.id AS job_id
+FROM job_postings j
+LEFT JOIN job_skill_matches s
+    ON j.id = s.job_id
+WHERE
+    LOWER(s.skill_name) LIKE '%machine learning%'
+    OR LOWER(s.skill_name) LIKE '%artificial intelligence%'
+    OR LOWER(s.skill_name) LIKE '%generative artificial intelligence%'
+    OR LOWER(s.skill_name) LIKE '%mlops%'
+    OR LOWER(s.skill_name) LIKE '%natural language processing%'
+    OR LOWER(s.skill_name) LIKE '%deep learning%'
+    OR LOWER(s.skill_name) LIKE '%pytorch%'
+    OR LOWER(s.skill_name) LIKE '%artificial neural networks%'
+    OR LOWER(s.skill_name) LIKE '%machine learning model training%'
+    OR LOWER(s.skill_name) LIKE '%large language modeling%'
+    OR LOWER(s.skill_name) LIKE '%random forest algorithm%'
+    OR LOWER(s.skill_name) LIKE '%decision tree learning%'
+    OR LOWER(j.title_clean) LIKE '%machine learning%'
+    OR LOWER(j.title_clean) LIKE '%artificial intelligence%'
+    OR LOWER(j.title_clean) LIKE '%ai engineer%'
+    OR LOWER(j.title_clean) LIKE '%ml engineer%'
+    OR LOWER(j.title_clean) LIKE '%generative ai%'
+    OR LOWER(j.title_clean) LIKE '%llm%'
+    OR LOWER(j.body) LIKE '%machine learning%'
+    OR LOWER(j.body) LIKE '%artificial intelligence%'
+    OR LOWER(j.body) LIKE '%generative ai%'
+    OR LOWER(j.body) LIKE '%large language model%'
+    OR LOWER(j.body) LIKE '%llm%'
+    OR LOWER(j.body) LIKE '%deep learning%'
+    OR LOWER(j.body) LIKE '%natural language processing%'
+""")
+
+ai_job_ids.createOrReplaceTempView("ai_job_ids")
+
+
+# ----------------------------
+# Jobs with AI classification
+# ----------------------------
+jobs_with_ai = (
+    job_postings_df.alias("j")
+    .join(
+        ai_job_ids.alias("a"),
+        col("j.id") == col("a.job_id"),
+        "left"
+    )
+    .withColumn(
+        "career_type",
+        when(col("a.job_id").isNotNull(), "AI-related")
+        .otherwise("Non-AI")
+    )
+)
+
+jobs_with_ai.createOrReplaceTempView("jobs_with_ai")
+
+
+# ----------------------------
+# Job-level skill flags for modeling
+# ----------------------------
+skill_features_df = job_skill_matches_df.groupBy("job_id").agg(
+    spark_max(when(lower(col("skill_name")).like("%python%"), 1).otherwise(0)).alias("has_python"),
+    spark_max(when(lower(col("skill_name")).like("%sql%"), 1).otherwise(0)).alias("has_sql"),
+    spark_max(when(lower(col("skill_name")).like("%machine learning%"), 1).otherwise(0)).alias("has_machine_learning"),
+    spark_max(when(lower(col("skill_name")).like("%tableau%"), 1).otherwise(0)).alias("has_tableau"),
+    spark_max(when(lower(col("skill_name")).like("%power bi%"), 1).otherwise(0)).alias("has_power_bi"),
+    spark_max(when(lower(col("skill_name")).like("%amazon web services%"), 1).otherwise(0)).alias("has_aws"),
+    spark_max(when(lower(col("skill_name")).like("%microsoft excel%"), 1).otherwise(0)).alias("has_excel"),
+    spark_max(when(lower(col("skill_name")).like("%sap%"), 1).otherwise(0)).alias("has_sap")
+)
+
+skill_features_df.createOrReplaceTempView("skill_features")
+
+
+# ----------------------------
+# Salary regression-ready dataset
+# ----------------------------
+salary_regression_data = (
+    job_postings_df.alias("j")
+    .join(locations_df.alias("l"), col("j.location_id") == col("l.location_id"), "left")
+    .join(occupations_df.alias("o"), col("j.occupation_id") == col("o.occupation_id"), "left")
+    .join(skill_features_df.alias("s"), col("j.id") == col("s.job_id"), "left")
+    .join(ai_job_ids.alias("a"), col("j.id") == col("a.job_id"), "left")
+    .select(
+        col("j.id"),
+        col("j.salary").cast("double").alias("salary"),
+        col("l.state_name"),
+        col("l.city_name"),
+        col("l.msa_name"),
+        col("j.title_clean"),
+        col("o.specialized_occupation_name"),
+        col("o.occupation_group_name"),
+        col("j.remote_type_name"),
+        col("j.employment_type_name"),
+        col("j.min_years_experience"),
+        col("j.max_years_experience"),
+        when(col("a.job_id").isNotNull(), 1).otherwise(0).alias("is_ai_related"),
+        col("s.has_python"),
+        col("s.has_sql"),
+        col("s.has_machine_learning"),
+        col("s.has_tableau"),
+        col("s.has_power_bi"),
+        col("s.has_aws"),
+        col("s.has_excel"),
+        col("s.has_sap")
+    )
+    .filter(
+        col("salary").isNotNull() &
+        (col("salary") > 0) &
+        (col("salary") <= 500000)
+    )
+    .fillna({
+        "state_name": "Unknown",
+        "city_name": "Unknown",
+        "msa_name": "Unknown",
+        "title_clean": "Unknown",
+        "specialized_occupation_name": "Unknown",
+        "occupation_group_name": "Unknown",
+        "remote_type_name": "Unknown",
+        "employment_type_name": "Unknown",
+        "min_years_experience": 0,
+        "max_years_experience": 0,
+        "has_python": 0,
+        "has_sql": 0,
+        "has_machine_learning": 0,
+        "has_tableau": 0,
+        "has_power_bi": 0,
+        "has_aws": 0,
+        "has_excel": 0,
+        "has_sap": 0
+    })
+)
+
+salary_regression_data.createOrReplaceTempView("salary_regression_data")
+
+
+# ----------------------------
+# Salary classification-ready dataset
+# ----------------------------
+avg_salary_value = salary_regression_data.selectExpr(
+    "AVG(salary) AS avg_salary"
+).collect()[0]["avg_salary"]
+
+salary_classification_data = salary_regression_data.withColumn(
+    "above_average_salary",
+    when(col("salary") > avg_salary_value, 1).otherwise(0)
+)
+
+salary_classification_data.createOrReplaceTempView("salary_classification_data")
+
+
+# ----------------------------
+# Save all prepared tables
+# ----------------------------
+companies_df.write.mode("overwrite").parquet("data/prepared/companies.parquet")
+industries_df.write.mode("overwrite").parquet("data/prepared/industries.parquet")
+locations_df.write.mode("overwrite").parquet("data/prepared/locations.parquet")
+occupations_df.write.mode("overwrite").parquet("data/prepared/occupations.parquet")
+job_postings_df.write.mode("overwrite").parquet("data/prepared/job_postings.parquet")
+skills_df.write.mode("overwrite").parquet("data/prepared/skills.parquet")
+job_skill_matches_df.write.mode("overwrite").parquet("data/prepared/job_skill_matches.parquet")
+ai_job_ids.write.mode("overwrite").parquet("data/prepared/ai_job_ids.parquet")
+jobs_with_ai.write.mode("overwrite").parquet("data/prepared/jobs_with_ai.parquet")
+skill_features_df.write.mode("overwrite").parquet("data/prepared/skill_features.parquet")
+salary_regression_data.write.mode("overwrite").parquet("data/prepared/salary_regression_data.parquet")
+salary_classification_data.write.mode("overwrite").parquet("data/prepared/salary_classification_data.parquet")
+skill_count_features_df.write.mode("overwrite").parquet("data/prepared/skill_count_features.parquet")
+print("Saved prepared tables to data/prepared/")
 ```

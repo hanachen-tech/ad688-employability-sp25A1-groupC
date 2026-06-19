@@ -40,8 +40,31 @@ spark = SparkSession.builder \
 
 spark.catalog.clearCache()
 
-df_clean = spark.read.parquet("data/cleaned/lightcast_cleaned.parquet")
-df_clean.createOrReplaceTempView("raw_jobs_clean")
+# Load prepared tables created by data_cleaning.qmd
+job_postings_df = spark.read.parquet("data/prepared/job_postings.parquet")
+companies_df = spark.read.parquet("data/prepared/companies.parquet")
+industries_df = spark.read.parquet("data/prepared/industries.parquet")
+locations_df = spark.read.parquet("data/prepared/locations.parquet")
+occupations_df = spark.read.parquet("data/prepared/occupations.parquet")
+skills_df = spark.read.parquet("data/prepared/skills.parquet")
+job_skill_matches_df = spark.read.parquet("data/prepared/job_skill_matches.parquet")
+ai_job_ids = spark.read.parquet("data/prepared/ai_job_ids.parquet")
+jobs_with_ai = spark.read.parquet("data/prepared/jobs_with_ai.parquet")
+salary_regression_data = spark.read.parquet("data/prepared/salary_regression_data.parquet")
+salary_classification_data = spark.read.parquet("data/prepared/salary_classification_data.parquet")
+
+# Register Spark SQL views
+job_postings_df.createOrReplaceTempView("job_postings")
+companies_df.createOrReplaceTempView("companies")
+industries_df.createOrReplaceTempView("industries")
+locations_df.createOrReplaceTempView("locations")
+occupations_df.createOrReplaceTempView("occupations")
+skills_df.createOrReplaceTempView("skills")
+job_skill_matches_df.createOrReplaceTempView("job_skill_matches")
+ai_job_ids.createOrReplaceTempView("ai_job_ids")
+jobs_with_ai.createOrReplaceTempView("jobs_with_ai")
+salary_regression_data.createOrReplaceTempView("salary_regression_data")
+salary_classification_data.createOrReplaceTempView("salary_classification_data")
 
 def style_table(df, format_dict=None):
     styled = df.style
@@ -71,32 +94,32 @@ def style_table(df, format_dict=None):
     ])
     return styled
 
-print("Cleaned rows:", df_clean.count())
-print("Cleaned columns:", len(df_clean.columns))
+print("Prepared job postings rows:", job_postings_df.count())
+print("Regression-ready rows:", salary_regression_data.count())
+print("Classification-ready rows:", salary_classification_data.count())
 ```
 
 ## 2. Preview Cleaned Dataset
 
 ```{python}
 #| echo: true
+#| warning: false
+#| message: false
 
-preview_cols = [
-    "ID",
-    "TITLE_CLEAN",
-    "COMPANY_NAME",
-    "CITY_NAME",
-    "STATE_NAME",
-    "REMOTE_TYPE_NAME",
-    "SALARY",
-    "SALARY_FROM",
-    "SALARY_TO",
-    "ANALYSIS_SALARY",
-    "POSTED_DATE"
-]
-
-available_preview_cols = [c for c in preview_cols if c in df_clean.columns]
-
-preview_df = df_clean.select(available_preview_cols).limit(10).toPandas()
+preview_df = job_postings_df.select(
+    "id",
+    "title_clean",
+    "company_id",
+    "industry_id",
+    "occupation_id",
+    "location_id",
+    "employment_type_name",
+    "remote_type_name",
+    "observed_analysis_salary",
+    "salary",
+    "salary_imputation_status",
+    "posted_date"
+).limit(10).toPandas()
 
 display(style_table(preview_df))
 ```
@@ -105,29 +128,64 @@ display(style_table(preview_df))
 
 ```{python}
 #| echo: true
+#| warning: false
+#| message: false
 
 summary = spark.sql("""
 SELECT
     COUNT(*) AS total_job_postings,
-    COUNT(DISTINCT ID) AS unique_job_ids,
-    COUNT(DISTINCT COMPANY_NAME) AS unique_companies,
-    COUNT(DISTINCT STATE_NAME) AS unique_states,
-    COUNT(DISTINCT NAICS_2022_6_NAME) AS unique_industries,
-    COUNT(DISTINCT LOT_SPECIALIZED_OCCUPATION_NAME) AS unique_occupations
-FROM raw_jobs_clean
+    COUNT(DISTINCT id) AS unique_job_ids,
+    COUNT(DISTINCT company_id) AS unique_companies,
+    COUNT(DISTINCT location_id) AS unique_locations,
+    COUNT(DISTINCT industry_id) AS unique_industries,
+    COUNT(DISTINCT occupation_id) AS unique_occupations
+FROM job_postings
 """).toPandas()
 
 display(style_table(summary, {
     "total_job_postings": "{:,.0f}",
     "unique_job_ids": "{:,.0f}",
     "unique_companies": "{:,.0f}",
-    "unique_states": "{:,.0f}",
+    "unique_locations": "{:,.0f}",
     "unique_industries": "{:,.0f}",
     "unique_occupations": "{:,.0f}"
 }))
 ```
+## 4. Validate Prepared Tables
+```{python}
+#| echo: true
+#| warning: false
+#| message: false
 
-## 4. Salary Availability After Imputation
+table_counts = spark.sql("""
+SELECT 'job_postings' AS table_name, COUNT(*) AS row_count FROM job_postings
+UNION ALL
+SELECT 'companies' AS table_name, COUNT(*) AS row_count FROM companies
+UNION ALL
+SELECT 'industries' AS table_name, COUNT(*) AS row_count FROM industries
+UNION ALL
+SELECT 'locations' AS table_name, COUNT(*) AS row_count FROM locations
+UNION ALL
+SELECT 'occupations' AS table_name, COUNT(*) AS row_count FROM occupations
+UNION ALL
+SELECT 'skills' AS table_name, COUNT(*) AS row_count FROM skills
+UNION ALL
+SELECT 'job_skill_matches' AS table_name, COUNT(*) AS row_count FROM job_skill_matches
+UNION ALL
+SELECT 'ai_job_ids' AS table_name, COUNT(*) AS row_count FROM ai_job_ids
+UNION ALL
+SELECT 'jobs_with_ai' AS table_name, COUNT(*) AS row_count FROM jobs_with_ai
+UNION ALL
+SELECT 'salary_regression_data' AS table_name, COUNT(*) AS row_count FROM salary_regression_data
+UNION ALL
+SELECT 'salary_classification_data' AS table_name, COUNT(*) AS row_count FROM salary_classification_data
+""").toPandas()
+
+display(style_table(table_counts, {
+    "row_count": "{:,.0f}"
+}))
+```
+## 5. Salary Availability After Imputation
 
 This section checks salary coverage using `ANALYSIS_SALARY_INDUSTRY_IMPUTED`, which combines observed salary values with qualified industry-median imputed salary values. This variable is used as the main salary variable for later salary-based analysis.
 
@@ -139,18 +197,18 @@ This section checks salary coverage using `ANALYSIS_SALARY_INDUSTRY_IMPUTED`, wh
 salary_availability = spark.sql("""
 SELECT
     CASE
-        WHEN ANALYSIS_SALARY_INDUSTRY_IMPUTED IS NOT NULL
-             AND ANALYSIS_SALARY_INDUSTRY_IMPUTED > 0
+        WHEN salary IS NOT NULL
+             AND salary > 0
         THEN 'Salary Available'
         ELSE 'Salary Missing'
     END AS salary_status,
     COUNT(*) AS job_count,
-    ROUND(COUNT(*) / (SELECT COUNT(*) FROM raw_jobs_clean) * 100, 2) AS job_share
-FROM raw_jobs_clean
+    ROUND(COUNT(*) / (SELECT COUNT(*) FROM job_postings) * 100, 2) AS job_share
+FROM job_postings
 GROUP BY
     CASE
-        WHEN ANALYSIS_SALARY_INDUSTRY_IMPUTED IS NOT NULL
-             AND ANALYSIS_SALARY_INDUSTRY_IMPUTED > 0
+        WHEN salary IS NOT NULL
+             AND salary > 0
         THEN 'Salary Available'
         ELSE 'Salary Missing'
     END
@@ -215,68 +273,27 @@ This section checks whether salary availability still differs across important g
 #| warning: false
 #| message: false
 
-ai_job_ids = spark.sql("""
-SELECT DISTINCT
-    ID AS job_id
-FROM raw_jobs_clean
-WHERE
-    LOWER(TITLE_CLEAN) LIKE '%machine learning%'
-    OR LOWER(TITLE_CLEAN) LIKE '%artificial intelligence%'
-    OR LOWER(TITLE_CLEAN) LIKE '%ai engineer%'
-    OR LOWER(TITLE_CLEAN) LIKE '%ml engineer%'
-    OR LOWER(TITLE_CLEAN) LIKE '%generative ai%'
-    OR LOWER(TITLE_CLEAN) LIKE '%llm%'
-    OR LOWER(BODY) LIKE '%machine learning%'
-    OR LOWER(BODY) LIKE '%artificial intelligence%'
-    OR LOWER(BODY) LIKE '%generative ai%'
-    OR LOWER(BODY) LIKE '%large language model%'
-    OR LOWER(BODY) LIKE '%llm%'
-    OR LOWER(BODY) LIKE '%deep learning%'
-    OR LOWER(BODY) LIKE '%natural language processing%'
-    OR LOWER(SPECIALIZED_SKILLS_NAME) LIKE '%machine learning%'
-    OR LOWER(SPECIALIZED_SKILLS_NAME) LIKE '%artificial intelligence%'
-    OR LOWER(SPECIALIZED_SKILLS_NAME) LIKE '%deep learning%'
-    OR LOWER(SPECIALIZED_SKILLS_NAME) LIKE '%natural language processing%'
-    OR LOWER(SOFTWARE_SKILLS_NAME) LIKE '%pytorch%'
-    OR LOWER(SOFTWARE_SKILLS_NAME) LIKE '%tensorflow%'
-""")
-
-ai_job_ids.createOrReplaceTempView("ai_job_ids")
-
-
 salary_missing_by_ai = spark.sql("""
 SELECT
-    CASE
-        WHEN a.job_id IS NOT NULL THEN 'AI-related'
-        ELSE 'Non-AI'
-    END AS career_type,
-    COUNT(DISTINCT r.ID) AS total_postings,
+    career_type,
+    COUNT(DISTINCT id) AS total_postings,
     COUNT(DISTINCT CASE
-        WHEN r.ANALYSIS_SALARY_INDUSTRY_IMPUTED IS NOT NULL
-             AND r.ANALYSIS_SALARY_INDUSTRY_IMPUTED > 0
-        THEN r.ID
+        WHEN salary IS NOT NULL AND salary > 0
+        THEN id
     END) AS salary_available,
     COUNT(DISTINCT CASE
-        WHEN r.ANALYSIS_SALARY_INDUSTRY_IMPUTED IS NULL
-             OR r.ANALYSIS_SALARY_INDUSTRY_IMPUTED <= 0
-        THEN r.ID
+        WHEN salary IS NULL OR salary <= 0
+        THEN id
     END) AS salary_missing,
     ROUND(
         COUNT(DISTINCT CASE
-            WHEN r.ANALYSIS_SALARY_INDUSTRY_IMPUTED IS NULL
-                 OR r.ANALYSIS_SALARY_INDUSTRY_IMPUTED <= 0
-            THEN r.ID
-        END) / COUNT(DISTINCT r.ID) * 100,
+            WHEN salary IS NULL OR salary <= 0
+            THEN id
+        END) / COUNT(DISTINCT id) * 100,
         2
     ) AS missing_salary_percent
-FROM raw_jobs_clean r
-LEFT JOIN ai_job_ids a
-    ON r.ID = a.job_id
-GROUP BY
-    CASE
-        WHEN a.job_id IS NOT NULL THEN 'AI-related'
-        ELSE 'Non-AI'
-    END
+FROM jobs_with_ai
+GROUP BY career_type
 ORDER BY missing_salary_percent DESC
 """).toPandas()
 
@@ -290,29 +307,26 @@ display(style_table(salary_missing_by_ai, {
 
 salary_missing_by_remote = spark.sql("""
 SELECT
-    REMOTE_TYPE_NAME AS remote_type,
-    COUNT(DISTINCT ID) AS total_postings,
+    remote_type_name AS remote_type,
+    COUNT(DISTINCT id) AS total_postings,
     COUNT(DISTINCT CASE
-        WHEN ANALYSIS_SALARY_INDUSTRY_IMPUTED IS NOT NULL
-             AND ANALYSIS_SALARY_INDUSTRY_IMPUTED > 0
-        THEN ID
+        WHEN salary IS NOT NULL AND salary > 0
+        THEN id
     END) AS salary_available,
     COUNT(DISTINCT CASE
-        WHEN ANALYSIS_SALARY_INDUSTRY_IMPUTED IS NULL
-             OR ANALYSIS_SALARY_INDUSTRY_IMPUTED <= 0
-        THEN ID
+        WHEN salary IS NULL OR salary <= 0
+        THEN id
     END) AS salary_missing,
     ROUND(
         COUNT(DISTINCT CASE
-            WHEN ANALYSIS_SALARY_INDUSTRY_IMPUTED IS NULL
-                 OR ANALYSIS_SALARY_INDUSTRY_IMPUTED <= 0
-            THEN ID
-        END) / COUNT(DISTINCT ID) * 100,
+            WHEN salary IS NULL OR salary <= 0
+            THEN id
+        END) / COUNT(DISTINCT id) * 100,
         2
     ) AS missing_salary_percent
-FROM raw_jobs_clean
-WHERE REMOTE_TYPE_NAME IS NOT NULL
-GROUP BY REMOTE_TYPE_NAME
+FROM job_postings
+WHERE remote_type_name IS NOT NULL
+GROUP BY remote_type_name
 ORDER BY missing_salary_percent DESC
 """).toPandas()
 
@@ -326,30 +340,29 @@ display(style_table(salary_missing_by_remote, {
 
 salary_missing_by_state = spark.sql("""
 SELECT
-    STATE_NAME AS state_name,
-    COUNT(DISTINCT ID) AS total_postings,
+    l.state_name,
+    COUNT(DISTINCT j.id) AS total_postings,
     COUNT(DISTINCT CASE
-        WHEN ANALYSIS_SALARY_INDUSTRY_IMPUTED IS NOT NULL
-             AND ANALYSIS_SALARY_INDUSTRY_IMPUTED > 0
-        THEN ID
+        WHEN j.salary IS NOT NULL AND j.salary > 0
+        THEN j.id
     END) AS salary_available,
     COUNT(DISTINCT CASE
-        WHEN ANALYSIS_SALARY_INDUSTRY_IMPUTED IS NULL
-             OR ANALYSIS_SALARY_INDUSTRY_IMPUTED <= 0
-        THEN ID
+        WHEN j.salary IS NULL OR j.salary <= 0
+        THEN j.id
     END) AS salary_missing,
     ROUND(
         COUNT(DISTINCT CASE
-            WHEN ANALYSIS_SALARY_INDUSTRY_IMPUTED IS NULL
-                 OR ANALYSIS_SALARY_INDUSTRY_IMPUTED <= 0
-            THEN ID
-        END) / COUNT(DISTINCT ID) * 100,
+            WHEN j.salary IS NULL OR j.salary <= 0
+            THEN j.id
+        END) / COUNT(DISTINCT j.id) * 100,
         2
     ) AS missing_salary_percent
-FROM raw_jobs_clean
-WHERE STATE_NAME IS NOT NULL
-GROUP BY STATE_NAME
-HAVING COUNT(DISTINCT ID) >= 100
+FROM job_postings j
+LEFT JOIN locations l
+    ON j.location_id = l.location_id
+WHERE l.state_name IS NOT NULL
+GROUP BY l.state_name
+HAVING COUNT(DISTINCT j.id) >= 100
 ORDER BY missing_salary_percent DESC
 LIMIT 20
 """).toPandas()
@@ -364,30 +377,29 @@ display(style_table(salary_missing_by_state, {
 
 salary_missing_by_industry = spark.sql("""
 SELECT
-    NAICS_2022_6_NAME AS industry,
-    COUNT(DISTINCT ID) AS total_postings,
+    i.naics_2022_6_name AS industry,
+    COUNT(DISTINCT j.id) AS total_postings,
     COUNT(DISTINCT CASE
-        WHEN ANALYSIS_SALARY_INDUSTRY_IMPUTED IS NOT NULL
-             AND ANALYSIS_SALARY_INDUSTRY_IMPUTED > 0
-        THEN ID
+        WHEN j.salary IS NOT NULL AND j.salary > 0
+        THEN j.id
     END) AS salary_available,
     COUNT(DISTINCT CASE
-        WHEN ANALYSIS_SALARY_INDUSTRY_IMPUTED IS NULL
-             OR ANALYSIS_SALARY_INDUSTRY_IMPUTED <= 0
-        THEN ID
+        WHEN j.salary IS NULL OR j.salary <= 0
+        THEN j.id
     END) AS salary_missing,
     ROUND(
         COUNT(DISTINCT CASE
-            WHEN ANALYSIS_SALARY_INDUSTRY_IMPUTED IS NULL
-                 OR ANALYSIS_SALARY_INDUSTRY_IMPUTED <= 0
-            THEN ID
-        END) / COUNT(DISTINCT ID) * 100,
+            WHEN j.salary IS NULL OR j.salary <= 0
+            THEN j.id
+        END) / COUNT(DISTINCT j.id) * 100,
         2
     ) AS missing_salary_percent
-FROM raw_jobs_clean
-WHERE NAICS_2022_6_NAME IS NOT NULL
-GROUP BY NAICS_2022_6_NAME
-HAVING COUNT(DISTINCT ID) >= 100
+FROM job_postings j
+LEFT JOIN industries i
+    ON j.industry_id = i.industry_id
+WHERE i.naics_2022_6_name IS NOT NULL
+GROUP BY i.naics_2022_6_name
+HAVING COUNT(DISTINCT j.id) >= 100
 ORDER BY missing_salary_percent DESC
 LIMIT 20
 """).toPandas()
@@ -402,7 +414,7 @@ display(style_table(salary_missing_by_industry, {
 
 **Insight:** Salary missingness remains important even after industry-median imputation. The imputed salary variable improves coverage, but missingness can still vary by AI classification, remote type, state, and industry. Salary-based results should therefore be interpreted with this remaining missingness in mind.
 
-## 5. Remote Type Distribution
+## 6. Remote Type Distribution
 
 ```{python}
 #| echo: true
@@ -411,17 +423,10 @@ display(style_table(salary_missing_by_industry, {
 
 remote_summary = spark.sql("""
 SELECT
-    CASE
-        WHEN REMOTE_TYPE_NAME IS NULL OR REMOTE_TYPE_NAME = '[None]' THEN 'Unknown'
-        ELSE REMOTE_TYPE_NAME
-    END AS remote_type,
+    COALESCE(remote_type_name, 'Unknown') AS remote_type,
     COUNT(*) AS job_count
-FROM raw_jobs_clean
-GROUP BY
-    CASE
-        WHEN REMOTE_TYPE_NAME IS NULL OR REMOTE_TYPE_NAME = '[None]' THEN 'Unknown'
-        ELSE REMOTE_TYPE_NAME
-    END
+FROM job_postings
+GROUP BY COALESCE(remote_type_name, 'Unknown')
 ORDER BY job_count DESC
 """).toPandas()
 
@@ -480,7 +485,7 @@ fig_remote.show()
 
 **Insight:** Remote-work status is not always clearly identified in the dataset, so the `Unknown` category is kept instead of being assumed to be on-site. Later remote-work salary comparisons should filter to clearly labeled categories such as Remote, Hybrid Remote, and Not Remote.
 
-## 6. Top 10 States by Job Postings
+## 7. Top 10 States by Job Postings
 
 ```{python}
 #| echo: true
@@ -489,11 +494,13 @@ fig_remote.show()
 
 top_states = spark.sql("""
 SELECT
-    STATE_NAME AS state_name,
+    l.state_name AS state_name,
     COUNT(*) AS job_count
-FROM raw_jobs_clean
-WHERE STATE_NAME IS NOT NULL
-GROUP BY STATE_NAME
+FROM job_postings j
+LEFT JOIN locations l
+    ON j.location_id = l.location_id
+WHERE l.state_name IS NOT NULL
+GROUP BY l.state_name
 ORDER BY job_count DESC
 LIMIT 10
 """).toPandas()
@@ -551,7 +558,7 @@ fig_states.show()
 
 **Insight:** The top states show where job-posting activity is most concentrated in the dataset. These states are important for later geographic salary comparisons because they provide larger sample sizes than smaller markets.
 
-## 7. Top 10 Industries by Job Postings
+## 8. Top 10 Industries by Job Postings
 
 ```{python}
 #| echo: true
@@ -560,11 +567,13 @@ fig_states.show()
 
 top_industries = spark.sql("""
 SELECT
-    NAICS_2022_6_NAME AS industry,
+    i.naics_2022_6_name AS industry,
     COUNT(*) AS job_count
-FROM raw_jobs_clean
-WHERE NAICS_2022_6_NAME IS NOT NULL
-GROUP BY NAICS_2022_6_NAME
+FROM job_postings j
+LEFT JOIN industries i
+    ON j.industry_id = i.industry_id
+WHERE i.naics_2022_6_name IS NOT NULL
+GROUP BY i.naics_2022_6_name
 ORDER BY job_count DESC
 LIMIT 10
 """).toPandas()
@@ -648,6 +657,103 @@ fig_industries.show()
 
 **Insight:** The industry distribution shows which sectors contribute the largest number of job postings. If an unclassified industry category is large, final industry-specific comparisons should either treat it as a data-quality category or exclude it when comparing clearly defined industries.
 
+## 9. Career Categories and Sample Job Titles
+```{python}
+#| echo: true
+#| warning: false
+#| message: false
+
+career_title_preview = spark.sql("""
+SELECT
+    o.specialized_occupation_name,
+    COUNT(j.id) AS job_count,
+    COUNT(DISTINCT j.title_clean) AS unique_job_titles,
+    CONCAT_WS(', ', SLICE(COLLECT_SET(j.title_clean), 1, 10)) AS sample_titles
+FROM job_postings j
+LEFT JOIN occupations o
+    ON j.occupation_id = o.occupation_id
+WHERE
+    o.specialized_occupation_name IS NOT NULL
+    AND j.title_clean IS NOT NULL
+GROUP BY
+    o.specialized_occupation_name
+ORDER BY
+    job_count DESC
+""").toPandas()
+
+display(style_table(career_title_preview, {
+    "job_count": "{:,.0f}",
+    "unique_job_titles": "{:,.0f}"
+}))
+```
+
+## 10. Top Skills in the Dataset
+```{python}
+#| echo: true
+#| warning: false
+#| message: false
+
+top_skills = spark.sql("""
+SELECT
+    skill_name,
+    skill_type,
+    COUNT(DISTINCT job_id) AS job_count
+FROM job_skill_matches
+GROUP BY
+    skill_name,
+    skill_type
+ORDER BY
+    job_count DESC
+LIMIT 100
+""").toPandas()
+
+display(style_table(top_skills, {
+    "job_count": "{:,.0f}"
+}))
+```
+
+## 11. Possible AI-Related Skills
+```{python}
+#| echo: true
+#| warning: false
+#| message: false
+
+possible_ai_skills = spark.sql("""
+SELECT
+    skill_name,
+    skill_type,
+    COUNT(DISTINCT job_id) AS job_count
+FROM job_skill_matches
+WHERE
+    LOWER(skill_name) LIKE '%machine%'
+    OR LOWER(skill_name) LIKE '%learning%'
+    OR LOWER(skill_name) LIKE '%artificial%'
+    OR LOWER(skill_name) LIKE '%intelligence%'
+    OR LOWER(skill_name) LIKE '%deep%'
+    OR LOWER(skill_name) LIKE '%neural%'
+    OR LOWER(skill_name) LIKE '%natural language%'
+    OR LOWER(skill_name) LIKE '%nlp%'
+    OR LOWER(skill_name) LIKE '%vision%'
+    OR LOWER(skill_name) LIKE '%generative%'
+    OR LOWER(skill_name) LIKE '%language model%'
+    OR LOWER(skill_name) LIKE '%llm%'
+    OR LOWER(skill_name) LIKE '%predictive%'
+    OR LOWER(skill_name) LIKE '%model%'
+    OR LOWER(skill_name) LIKE '%algorithm%'
+    OR LOWER(skill_name) LIKE '%data science%'
+GROUP BY
+    skill_name,
+    skill_type
+ORDER BY
+    job_count DESC
+LIMIT 100
+""").toPandas()
+
+display(style_table(possible_ai_skills, {
+    "job_count": "{:,.0f}"
+}))
+```
+
 ## EDA Summary Findings
 
-The exploratory analysis shows that the cleaned dataset contains 72,476 job postings and uses `ANALYSIS_SALARY_INDUSTRY_IMPUTED` as the main salary variable for salary-based analysis. After industry-median imputation, 39,244 postings have usable salary values and 33,232 postings still have missing salary information. Salary missingness remains important and should be considered when interpreting salary-based results. The remote-work distribution contains a large unknown category, so later remote comparisons should focus on clearly labeled remote, hybrid, and not-remote postings. The geographic and industry distributions show where job-posting activity is concentrated and help guide later salary, AI, and regional analysis.
+The exploratory analysis shows that the prepared dataset contains 72,476 job postings and that the salary-ready modeling sample contains 39,244 postings. The prepared relational tables include companies, industries, locations, occupations, skills, job-skill matches, AI job classifications, and salary modeling datasets. Salary availability improves after using the industry-median imputed salary variable, but missingness still varies across AI classification, remote-work type, state, and industry. The remote-work distribution contains a large unknown category, so later salary comparisons should focus on clearly labeled remote, hybrid, and not-remote postings. The top states, industries, occupations, and skills provide context for later salary, AI, and predictive modeling analyses.
