@@ -8,6 +8,7 @@ format: html
 
 Welcome to our Job Market Analysis project! Utilizing the comprehensive **Lightcast job postings dataset**, our team leveraged Python and PySpark to perform large-scale data cleaning, exploratory data analysis (EDA), salary trend evaluations, and predictive modeling. This project aims to uncover the latest dynamics of the 2024 job market and map out strategic career paths for our team.
 
+![Image is Created by ChatGPT, 2026](HomePage_Image.png){.hero-image}
 ---
 
 ## 📌 Project Highlights & Executive Summary
