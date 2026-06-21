@@ -4,14 +4,12 @@ author: "Nutchanon Chaiyaratana and Afreen Alam"
 date: today
 format:
   html:
-    theme: cerulean
+    theme: cosmo
     toc: true
     toc-depth: 2
-    embed-resources: true
     code-fold: true
     code-summary: "Show code"
-date-modified: today
-date-format: long
+    embed-resources: true
 execute:
   echo: true
   eval: true
@@ -161,7 +159,7 @@ salary_distribution_pd = salary_distribution.toPandas()
 
 import plotly.express as px
 
-fig_ai_salary = px.box(
+fig_ai_salary = px.violin(
     salary_distribution_pd,
     x="career_type",
     y="salary",
@@ -288,7 +286,11 @@ WHERE
 """)
 
 remote_salary_pd = remote_salary.toPandas()
-
+remote_salary_pd["remote_type"] = remote_salary_pd["remote_type"].astype(str)
+remote_salary_pd = remote_salary_pd[
+    (~remote_salary_pd["remote_type"].isna()) & 
+    (~remote_salary_pd["remote_type"].isin(["None", "Unknown", "nan", "null", ""]))
+]
 fig_remote = px.box(
     remote_salary_pd,
     x="remote_type",
@@ -359,14 +361,58 @@ fig_industry = px.line(
     title="Monthly Salary Trends by Industry (2024)"
 )
 
+buttons = []
+buttons.append(dict(
+    method="update",
+    label="All Industries",
+    args=[{"visible": [True] * len(top_industries)},
+      {"title": "Industry Performance Overview"}]
+))
+
+# Create buttons to isolate each industry
+for i, industry in enumerate(top_industries):
+    visibility = [False] * len(top_industries)
+    visibility[i] = True
+    
+    buttons.append(dict(
+        method="update",
+        label=industry,
+        args=[{"visible": visibility},
+              {"title": f"Industry Performance: {industry}"}]
+    ))
+
 fig_industry.update_layout(
+    title={
+        "text": "Monthly Salary Trends by Industry (2024)",
+        "x": 0.0,        
+        "xanchor": "left",
+        "y": 0.97
+    },
+    updatemenus=[
+        dict(
+            active=0,
+            direction="down",
+            x=0,          # align with left edge of plot
+            y=1.08,       # below title
+            xanchor="left",
+            yanchor="top",
+            buttons=buttons
+        )
+    ],
+    margin=dict(
+        t=100,   # increase top margin
+        r=120
+    ),
     template="plotly_white",
     xaxis_title="Month",
     yaxis_title="Average Salary"
 )
 
-#fig_industry.show()
+fig_industry.show()
 ```
+Insight: Agents for Wireless Telecommunications Services saw the most volatile salary swings, 
+dropping to a low of $100k in June before surging back to lead the pack near $340k by September. Meanwhile, most other industries maintained relatively 
+flat and stable wage trends throughout 2024.
 
 ## Salary & Compensation Trends Dashboard
 
@@ -411,7 +457,11 @@ fig_ai_premium.show()
 #| label: fig-remote
 #| fig-cap: "Salary Distribution By Work-Arrangement"
 
-fig_remote.update_layout(margin=dict(l=20, r=20, t=40, b=20))
+fig_remote.update_layout(
+    height=400,                            # Matches right plot height
+    margin=dict(l=20, r=20, t=40, b=20)   # Matches right plot padding exactly
+)
+
 fig_remote.show()
 ```
 
@@ -421,18 +471,30 @@ fig_remote.show()
 #| fig-cap: "Salary Growth By Industry"
 
 fig_industry.update_layout(
+    height=400,
+    margin=dict(l=20, r=20, t=40, b=20), 
     legend=dict(
         orientation="h", 
         yanchor="top", 
-        y=-0.35,              # Pushes it further below the "Month" label
+        y=-0.35,              
         xanchor="center", 
         x=0.5,
-        font=dict(size=9)     # Slightly smaller font keeps multi-row text compact
-    ),
-    margin=dict(l=20, r=20, t=40, b=120),  
-    height=400
+        font=dict(size=9)     
+    )
 )
 fig_industry.update_xaxes(categoryorder='array', categoryarray=['May', 'Jun', 'Jul', 'Aug', 'Sep'])
 fig_industry.show()
 ```
 :::
+
+# Key Insights
+
+- The AI Premium: AI-related roles offer a significantly higher median salary and clear premium across almost all U.S. states compared to non-AI positions.
+- Work Arrangement Flexibility: Fully remote and hybrid roles match or outpace traditional on-site ("Not Remote") distribution curves, signaling no financial penalty for flexible environments.
+- Industry Wage Volatility: Tech-adjacent sectors, particularly Agents for Wireless Telecommunications, exhibit massive monthly wage growth and volatility, while traditional industries like manufacturing remain flat.
+
+# Recommendations for Job Seekers
+
+- Target AI Upskilling: Integrate AI skills such as programming, machine learning, agentic AI capabilities into your current skill set to unlock higher baseline salaries.
+- Geographic Arbitrage: Utilize fully remote roles to secure high-paying positions anchored in tech-heavy regions without needing to relocate.
+- Timing over Tech-Adjacent Roles: If target industries involve high-volatility salary trends (like telecommunications), expect highly fluid compensation structures and time your negotiations during peak market upswings.
