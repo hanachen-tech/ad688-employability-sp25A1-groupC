@@ -26,7 +26,7 @@ ul.task-list li input[type="checkbox"] {
 </style>
 
 
-<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.5.1/dist/jquery.min.js" integrity="sha384-ZvpUoO/+PpLXR1lu4jmpXWu80pZlYUAfxl5NsBMWOEPSjUn/6Z/hRTt8+pR6L4N2" crossorigin="anonymous"></script><script src="site_libs/quarto-nav/quarto-nav.js"></script>
 <script src="site_libs/quarto-nav/headroom.min.js"></script>
 <script src="site_libs/clipboard/clipboard.min.js"></script>
 <script src="site_libs/quarto-search/autocomplete.umd.js"></script>
@@ -70,6 +70,9 @@ ul.task-list li input[type="checkbox"] {
     "search-label": "Search"
   }
 }</script>
+<script src="https://cdn.jsdelivr.net/npm/requirejs@2.3.6/require.min.js" integrity="sha384-c9c+LnTbwQ3aujuU7ULEPVvgLs+Fn6fJUvIGTsuu1ZcCf11fiEubah0ttpca4ntM sha384-6V1/AdqZRWk1KAlWbKBlGhN7VG4iE/yAZcO6NZPMF8od0vukrvr0tg4qY6NSrItx" crossorigin="anonymous"></script>
+
+<script type="application/javascript">define('jquery', [],function() {return window.jQuery;})</script>
 
 
 </head>
@@ -167,6 +170,131 @@ ul.task-list li input[type="checkbox"] {
 </header>
 
 
+<div id="b00f1915" class="cell" data-message="false" data-execution_count="1">
+<div class="cell-output cell-output-stdout">
+<pre><code>Top 20 skills: ['\n  "Communication"', '\n  "Data Analysis"', '\n  "Management"', '\n  "SQL (Programming Language)"', '\n  "Leadership"', '\n  "Problem Solving"', '\n  "Operations"', '\n  "Microsoft Excel"', '\n  "Project Management"', '\n  "Business Requirements"', '\n  "Dashboard"', '\n  "Business Process"', '\n  "Python (Programming Language)"', '\n  "Finance"', '\n  "Writing"', '\n  "Planning"', '\n  "Business Intelligence"', '\n  "SAP Applications"', '\n  "Presentations"', '\n  "Consulting"']</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Model rows: 30808</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">Metric</th>
+<th data-quarto-table-cell-role="th">Value</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">0</th>
+<td>R²</td>
+<td>0.2687</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">1</th>
+<td>RMSE</td>
+<td>38253.7300</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">2</th>
+<td>MAE</td>
+<td>29050.2400</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+=== Salary Impact by Feature ===</code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+
+
+<table class="dataframe caption-top table table-sm table-striped small" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">Feature</th>
+<th data-quarto-table-cell-role="th">Coefficient</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">78</th>
+<td>Montana</td>
+<td>185112.694519</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">40</th>
+<td>Ohio</td>
+<td>184415.728386</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">52</th>
+<td>Tennessee</td>
+<td>184104.717980</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">35</th>
+<td>Florida</td>
+<td>183281.143449</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">42</th>
+<td>Georgia</td>
+<td>182757.798188</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">...</th>
+<td>...</td>
+<td>...</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">15</th>
+<td>data analyst ii</td>
+<td>-61618.499903</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">2</th>
+<td>business intelligence analyst</td>
+<td>-65524.188607</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">7</th>
+<td>data and reporting professional</td>
+<td>-67913.339338</td>
+</tr>
+<tr class="even">
+<th data-quarto-table-cell-role="th">14</th>
+<td>retail data analyst</td>
+<td>-73126.440700</td>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">28</th>
+<td>financial systems analyst oracle cloud erp</td>
+<td>-75429.382200</td>
+</tr>
+</tbody>
+</table>
+
+<p>100 rows × 2 columns</p>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Intercept (Base Salary): $-19,603
+R²: 0.2761
+Adjusted R²: 0.2731</code></pre>
+</div>
+</div>
 <section id="model-performance" class="level2">
 <h2 class="anchored" data-anchor-id="model-performance">Model Performance</h2>
 <p>To model salary based on location, job title, and skills, we applied Multiple Linear Regression using PySpark’s ML pipeline on 30,808 job postings with valid salary data. The model used the top 20 job titles, all states, and three core skill indicators (Python, SQL, Excel) as predictors.</p>
