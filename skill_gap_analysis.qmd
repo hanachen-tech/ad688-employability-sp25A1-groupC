@@ -339,26 +339,6 @@ The gap analysis highlights three tiers of urgency:
 
 ---
 
-### Findings
-
-The gap analysis highlights three tiers of urgency:
-
-**🔴 High Priority (Gap > 1.5)**
-
-- **Python** — Team average of 2.5 vs. market demand of 4.75. This is the single most critical gap. Python is required in nearly every data role, and the team's current level is insufficient for professional-level work.
-- **Machine Learning** — Team average of 1.75 vs. market demand of 3.75. Most team members have minimal hands-on experience, yet ML fluency is increasingly expected even in analyst-level roles.
-- **Cloud Computing** — Team average of 1.5 vs. market demand of 3.25. While less universally required, cloud proficiency is becoming a table-stakes expectation in enterprise environments.
-
-**🟡 Medium Priority (Gap 0.5–1.5)**
-
-- **Git/GitHub** — The gap is moderate numerically, but the skill's foundational nature makes it practically more urgent. Collaborative work in any technical role depends on version control.
-- **R** — A smaller gap, but largely because market demand for R is also lower relative to Python.
-
-**🟢 Low Priority (Gap < 0.5)**
-
-- **Statistical Analysis** and **SQL** — The team performs relatively close to market expectations. These are areas to maintain and deepen rather than urgently build from scratch.
-
----
 
 ## Part 5: Improvement Plan
 
@@ -490,20 +470,3 @@ for skill in high_priority.index:
         for resource in resources[skill]:
             print(f"  • {resource}")
 ```
----
-
-## Summary
-
-This skill gap analysis reveals a team that is building a solid foundation but has significant room to grow in areas the market increasingly considers baseline competencies.
-
-| Skill | Team Avg | Market (1–5) | Gap | Priority |
-|-------|----------|--------------|-----|----------|
-| Python | 2.5 | 4.75 | 2.25 | 🔴 High |
-| Machine Learning | 1.75 | 3.75 | 2.00 | 🔴 High |
-| Cloud Computing | 1.50 | 3.25 | 1.75 | 🔴 High |
-| Git/GitHub | 1.25 | 2.60 | 1.35 | 🟡 Medium |
-| R | 1.75 | 2.25 | 0.50 | 🟡 Medium |
-| Statistical Analysis | 2.75 | 3.00 | 0.25 | 🟢 Low |
-| SQL | 2.50 | 4.40 | 1.90 | 🔴 High |
-
-The most actionable takeaway: **Python and SQL should be the immediate focus for all team members**, as they represent both the highest market demand and among the largest gaps. Complementing these with Git/GitHub fluency would quickly make any team member job-ready for entry-level data roles. Machine Learning and Cloud Computing can follow as intermediate-term goals once foundational scripting skills are solidified.
