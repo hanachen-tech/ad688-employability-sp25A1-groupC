@@ -1,1 +1,86 @@
-/* css styles */
+
+/* styles.css */
+
+h1, h2, .slide-title {
+    color: #002147 !important;
+    font-family: 'Poppins', sans-serif;
+}
+
+h3, h4 {
+    color: #00A6A6 !important; 
+}
+
+.navbar {
+    background-color: #002147 !important;
+}
+
+.navbar a, .navbar-brand, .nav-link {
+    color: #ffffff !important;
+}
+
+.nav-link:hover {
+    color: #00A6A6 !important;
+}
+
+.hero-image {
+    display: block;
+    margin: 30px auto;
+    max-width: 80%;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgb(159, 198, 228);
+}
+
+#toc-title, 
+.sidebar nav[role="doc-toc"] ul li a, 
+.toc-actions a {
+    color: #002147 !important;
+    opacity: 0.8; 
+}
+
+.sidebar nav[role="doc-toc"] ul li a:hover,
+.sidebar nav[role="doc-toc"] ul li a.active {
+    color: #00A6A6 !important; 
+    opacity: 1 !important;
+    border-left-color: #00A6A6 !important; 
+}
+
+
+a {
+    color: #002147 !important;
+    text-decoration: none !important;
+    transition: all 0.2s ease-in-out !important;
+    position: relative;
+    display: inline-block;
+}
+
+a:hover {
+    color: #00A6A6 !important;
+    text-decoration: underline;
+    transform: translateY(-2px) scale(1.03); 
+    text-shadow: 0 0 10px rgba(0, 166, 166, 0.3);
+    cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' style='font-size:24px'><text y='24'>🤖</text></svg>"), pointer !important;
+}
+
+a::after {
+    content: '';
+    position: absolute;
+    width: 100%;
+    transform: scaleX(0);
+    height: 2px;
+    bottom: -2px;
+    left: 0;
+    background-color: #00A6A6;
+    transform-origin: bottom right;
+    transition: transform 0.25s ease-out;
+}
+
+a:hover::after {
+    transform: scaleX(1);
+    transform-origin: bottom left;
+}
+
+.content-area a, .markdown-section a {
+    color: #002147 !important;
+}
+
+
