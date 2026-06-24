@@ -21,410 +21,1244 @@ execute:
 # Use Multiple Linear Regression to model salary based on location, job title, skills, remote type, employment type, minimum experience, and education level.
 
 ### Load data
+# Multiple Linear Regression Salary Analysis
+
+This section uses Multiple Linear Regression to predict salary from job posting characteristics. We first build a baseline model, then use feature ablation to identify which feature groups matter most. Based on the ablation results, we build an improved Model 2 and compare the two models.
+
+## Model 1: Baseline Multiple Linear Regression
+
+Model 1 predicts salary using seven main feature groups: location, job title, skills, remote work type, employment type, minimum years of experience, and education level.
+
 ```{python}
+
 #| echo: false
+
 #| warning: false
+
 #| message: false
 
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, when, trim, regexp_replace, count as spark_count
+
+from pyspark.sql.functions import col, when, trim, regexp_replace, count as spark_count, lower
+
 from pyspark.ml.feature import StringIndexer, OneHotEncoder, VectorAssembler
+
 from pyspark.ml.regression import LinearRegression
+
 from pyspark.ml import Pipeline
+
 from pyspark.ml.evaluation import RegressionEvaluator
+
 from IPython.display import display
+
 import pandas as pd
+
 import plotly.express as px
 
-spark = SparkSession.builder \
-    .config("spark.driver.host", "localhost") \
-    .config("spark.driver.memory", "4g") \
-    .config("spark.executor.memory", "4g") \
-    .appName("SalaryMLR") \
+spark = (
+    SparkSession.builder
+    .config("spark.driver.host", "localhost")
+    .config("spark.driver.memory", "4g")
+    .config("spark.executor.memory", "4g")
+    .appName("SalaryMLR")
     .getOrCreate()
+)
 
 spark.catalog.clearCache()
+
 spark.sparkContext.setLogLevel("ERROR")
 
 # Load prepared model-ready dataset from data_cleaning.qmd
-df_model_base = spark.read.parquet("data/prepared/salary_regression_data.parquet")
+
+df_model1_base = spark.read.parquet("data/prepared/salary_regression_data.parquet")
+
 skill_count_features_df = spark.read.parquet("data/prepared/skill_count_features.parquet")
 
-df_model_base = df_model_base.join(
+df_model1_base = df_model1_base.join(
+
     skill_count_features_df,
-    df_model_base.id == skill_count_features_df.job_id,
+
+    df_model1_base.id == skill_count_features_df.job_id,
+
     how="left"
+
 ).drop("job_id")
 
 # Add education level from cleaned dataset
-education_df = (
+
+education_df_model1 = (
+
     spark.read.parquet("data/cleaned/lightcast_cleaned.parquet")
+
     .select(
+
         col("ID").alias("id"),
+
         col("EDUCATION_LEVELS_NAME").alias("education_level")
+
     )
+
     .dropDuplicates(["id"])
+
 )
 
-df_model_base = (
-    df_model_base
-    .join(education_df, on="id", how="left")
+df_model1_base = (
+
+    df_model1_base
+
+    .join(education_df_model1, on="id", how="left")
+
     .withColumn(
+
         "education_level",
+
         trim(
+
             regexp_replace(
+
                 regexp_replace(col("education_level"), r"[\n\r]", " "),
+
                 r"\s+",
+
                 " "
+
             )
+
         )
+
     )
+
     .fillna({"education_level": "Unknown"})
+
 )
 
 # Keep only valid salary rows
-df_salary = df_model_base.filter(
+
+df_salary1 = df_model1_base.filter(
+
     col("salary").isNotNull() &
+
     (col("salary") > 0) &
+
     (col("salary") <= 500000)
+
 ).cache()
 
-# Group job titles using top 30 titles, same idea as friend's model
-top_titles = [
+# Group job titles using top 30 titles
+
+top_titles_model1 = [
+
     r["title_clean"] for r in
-    df_salary.groupBy("title_clean")
+
+    df_salary1.groupBy("title_clean")
+
     .agg(spark_count("*").alias("cnt"))
+
     .orderBy(col("cnt").desc())
+
     .limit(30)
+
     .collect()
+
 ]
 
-df_model = df_salary.withColumn(
+df_model1 = df_salary1.withColumn(
+
     "title_grouped",
-    when(col("title_clean").isin(top_titles), col("title_clean")).otherwise("Other")
+
+    when(col("title_clean").isin(top_titles_model1), col("title_clean")).otherwise("Other")
+
 )
 
-# Actual skill flags prepared in data_cleaning.qmd
-skill_cols = [
+# Skill features prepared in data_cleaning.qmd
+
+skill_cols_model1 = [
+
     "has_python",
+
     "has_sql",
+
     "has_machine_learning",
+
     "has_tableau",
+
     "has_power_bi",
+
     "has_aws",
+
     "has_excel",
+
     "has_sap",
+
     "common_skill_count",
+
     "specialized_skill_count",
+
     "software_skill_count"
+
 ]
 
-# Select seven feature groups:
-# 1 location, 2 job title, 3 skills, 4 remote type, 5 employment type, 6 min experience, 7 education
-df_model = (
-    df_model
+# Select Model 1 features
+
+df_model1 = (
+
+    df_model1
+
+    .select(
+
+        ["salary",
+
+         "state_name",
+
+         "title_grouped",
+
+         "remote_type_name",
+
+         "employment_type_name",
+
+         "min_years_experience",
+
+         "education_level"] + skill_cols_model1
+
+    )
+
+    .fillna({
+
+        "state_name": "Unknown",
+
+        "title_grouped": "Other",
+
+        "remote_type_name": "Unknown",
+
+        "employment_type_name": "Unknown",
+
+        "min_years_experience": 0,
+
+        "education_level": "Unknown",
+
+        "has_python": 0,
+
+        "has_sql": 0,
+
+        "has_machine_learning": 0,
+
+        "has_tableau": 0,
+
+        "has_power_bi": 0,
+
+        "has_aws": 0,
+
+        "has_excel": 0,
+
+        "has_sap": 0,
+
+        "common_skill_count": 0,
+
+        "specialized_skill_count": 0,
+
+        "software_skill_count": 0
+
+    })
+
+    .cache()
+
+)
+
+print("Model 1 rows:", df_model1.count())
+
+print("Model 1 top 30 grouped titles:", top_titles_model1[:10], "...")
+
+# Model 1 categorical encoders
+
+title_indexer_model1 = StringIndexer(
+
+    inputCol="title_grouped",
+
+    outputCol="title_idx",
+
+    handleInvalid="keep"
+
+)
+
+title_encoder_model1 = OneHotEncoder(
+
+    inputCol="title_idx",
+
+    outputCol="title_vec",
+
+    dropLast=False
+
+)
+
+state_indexer_model1 = StringIndexer(
+
+    inputCol="state_name",
+
+    outputCol="state_idx",
+
+    handleInvalid="keep"
+
+)
+
+state_encoder_model1 = OneHotEncoder(
+
+    inputCol="state_idx",
+
+    outputCol="state_vec",
+
+    dropLast=False
+
+)
+
+remote_indexer_model1 = StringIndexer(
+
+    inputCol="remote_type_name",
+
+    outputCol="remote_idx",
+
+    handleInvalid="keep"
+
+)
+
+remote_encoder_model1 = OneHotEncoder(
+
+    inputCol="remote_idx",
+
+    outputCol="remote_vec",
+
+    dropLast=False
+
+)
+
+employment_indexer_model1 = StringIndexer(
+
+    inputCol="employment_type_name",
+
+    outputCol="employment_idx",
+
+    handleInvalid="keep"
+
+)
+
+employment_encoder_model1 = OneHotEncoder(
+
+    inputCol="employment_idx",
+
+    outputCol="employment_vec",
+
+    dropLast=False
+
+)
+
+education_indexer_model1 = StringIndexer(
+
+    inputCol="education_level",
+
+    outputCol="education_idx",
+
+    handleInvalid="keep"
+
+)
+
+education_encoder_model1 = OneHotEncoder(
+
+    inputCol="education_idx",
+
+    outputCol="education_vec",
+
+    dropLast=False
+
+)
+
+assembler_model1 = VectorAssembler(
+
+    inputCols=[
+
+        "title_vec",
+
+        "state_vec",
+
+        "remote_vec",
+
+        "employment_vec",
+
+        "education_vec",
+
+        "min_years_experience"
+
+    ] + skill_cols_model1,
+
+    outputCol="features"
+
+)
+
+lr_model1_estimator = LinearRegression(
+
+    featuresCol="features",
+
+    labelCol="salary"
+
+)
+
+pipeline_model1 = Pipeline(stages=[
+
+    title_indexer_model1, title_encoder_model1,
+
+    state_indexer_model1, state_encoder_model1,
+
+    remote_indexer_model1, remote_encoder_model1,
+
+    employment_indexer_model1, employment_encoder_model1,
+
+    education_indexer_model1, education_encoder_model1,
+
+    assembler_model1, lr_model1_estimator
+
+])
+
+train_model1, test_model1 = df_model1.randomSplit([0.8, 0.2], seed=42)
+
+model1 = pipeline_model1.fit(train_model1)
+
+predictions_model1 = model1.transform(test_model1)
+
+# Model 1 metrics
+
+r2_model1 = RegressionEvaluator(
+
+    labelCol="salary",
+
+    predictionCol="prediction",
+
+    metricName="r2"
+
+).evaluate(predictions_model1)
+
+rmse_model1 = RegressionEvaluator(
+
+    labelCol="salary",
+
+    predictionCol="prediction",
+
+    metricName="rmse"
+
+).evaluate(predictions_model1)
+
+mae_model1 = RegressionEvaluator(
+
+    labelCol="salary",
+
+    predictionCol="prediction",
+
+    metricName="mae"
+
+).evaluate(predictions_model1)
+
+lr_model1 = model1.stages[-1]
+
+n_model1 = predictions_model1.count()
+
+p_model1 = len(lr_model1.coefficients)
+
+adjusted_r2_model1 = (
+
+    1 - ((1 - r2_model1) * (n_model1 - 1) / (n_model1 - p_model1 - 1))
+
+    if n_model1 > p_model1 + 1
+
+    else None
+
+)
+
+metrics_df_model1 = pd.DataFrame({
+
+    "Metric": ["R²", "Adjusted R²", "RMSE", "MAE"],
+
+    "Value": [
+
+        round(r2_model1, 4),
+
+        round(adjusted_r2_model1, 4) if adjusted_r2_model1 is not None else None,
+
+        round(rmse_model1, 2),
+
+        round(mae_model1, 2)
+
+    ]
+
+})
+
+display(metrics_df_model1)
+
+# Model 1 coefficient table
+
+coefficients_model1 = lr_model1.coefficients.toArray()
+
+title_labels_model1 = list(model1.stages[0].labels) + ["title_unseen"]
+
+state_labels_model1 = list(model1.stages[2].labels) + ["state_unseen"]
+
+remote_labels_model1 = list(model1.stages[4].labels) + ["remote_unseen"]
+
+employment_labels_model1 = list(model1.stages[6].labels) + ["employment_unseen"]
+
+education_labels_model1 = list(model1.stages[8].labels) + ["education_unseen"]
+
+feature_names_model1 = (
+
+    ["Title: " + x for x in title_labels_model1] +
+
+    ["State: " + x for x in state_labels_model1] +
+
+    ["Remote: " + x for x in remote_labels_model1] +
+
+    ["Employment: " + x for x in employment_labels_model1] +
+
+    ["Education: " + x for x in education_labels_model1] +
+
+    ["Minimum Years Experience"] +
+
+    ["Skill: " + x.replace("has_", "").replace("_", " ").title() for x in skill_cols_model1]
+
+)
+
+feature_names_model1 = feature_names_model1[:len(coefficients_model1)]
+
+coef_df_model1 = pd.DataFrame({
+
+    "Feature": feature_names_model1,
+
+    "Coefficient": coefficients_model1
+
+})
+
+coef_df_model1 = coef_df_model1[
+
+    ~coef_df_model1["Feature"].str.contains("unseen", case=False, na=False)
+
+].sort_values("Coefficient", ascending=False)
+
+print("\n=== Model 1: Salary Impact by Feature ===")
+
+display(coef_df_model1)
+
+print(f"\nModel 1 Intercept: ${lr_model1.intercept:,.0f}")
+
+print(f"Model 1 Test R²: {r2_model1:.4f}")
+
+print(
+
+    f"Model 1 Test Adjusted R²: {adjusted_r2_model1:.4f}"
+
+    if adjusted_r2_model1 is not None
+
+    else "Model 1 Adjusted R²: not available"
+
+)
+
+```
+
+## Model 1 Feature Ablation
+
+The ablation test removes one feature group at a time to see how much model performance decreases. A larger R² drop or larger RMSE/MAE increase means the removed feature group is more important.
+
+```{python}
+
+#| echo: false
+
+#| warning: false
+
+#| message: false
+
+base_feature_groups_model1 = {
+
+    "Job Title": ["title_vec"],
+
+    "Location": ["state_vec"],
+
+    "Remote Type": ["remote_vec"],
+
+    "Employment Type": ["employment_vec"],
+
+    "Education": ["education_vec"],
+
+    "Experience": ["min_years_experience"],
+
+    "Skills": skill_cols_model1
+
+}
+
+base_transform_stages_model1 = [
+
+    title_indexer_model1, title_encoder_model1,
+
+    state_indexer_model1, state_encoder_model1,
+
+    remote_indexer_model1, remote_encoder_model1,
+
+    employment_indexer_model1, employment_encoder_model1,
+
+    education_indexer_model1, education_encoder_model1
+
+]
+
+def evaluate_without_group_model1(group_to_remove):
+
+    selected_inputs = []
+
+    for group_name, cols in base_feature_groups_model1.items():
+
+        if group_name != group_to_remove:
+
+            selected_inputs.extend(cols)
+
+    temp_assembler = VectorAssembler(
+
+        inputCols=selected_inputs,
+
+        outputCol="features"
+
+    )
+
+    temp_lr = LinearRegression(
+
+        featuresCol="features",
+
+        labelCol="salary"
+
+    )
+
+    temp_pipeline = Pipeline(
+
+        stages=base_transform_stages_model1 + [temp_assembler, temp_lr]
+
+    )
+
+    temp_model = temp_pipeline.fit(train_model1)
+
+    temp_predictions = temp_model.transform(test_model1)
+
+    temp_r2 = RegressionEvaluator(
+
+        labelCol="salary",
+
+        predictionCol="prediction",
+
+        metricName="r2"
+
+    ).evaluate(temp_predictions)
+
+    temp_rmse = RegressionEvaluator(
+
+        labelCol="salary",
+
+        predictionCol="prediction",
+
+        metricName="rmse"
+
+    ).evaluate(temp_predictions)
+
+    temp_mae = RegressionEvaluator(
+
+        labelCol="salary",
+
+        predictionCol="prediction",
+
+        metricName="mae"
+
+    ).evaluate(temp_predictions)
+
+    return temp_r2, temp_rmse, temp_mae
+
+ablation_results_model1 = []
+
+for group_name in base_feature_groups_model1.keys():
+
+    temp_r2, temp_rmse, temp_mae = evaluate_without_group_model1(group_name)
+
+    ablation_results_model1.append({
+
+        "Removed Feature Group": group_name,
+
+        "R² Without Group": round(temp_r2, 4),
+
+        "R² Drop": round(r2_model1 - temp_r2, 4),
+
+        "RMSE Without Group": round(temp_rmse, 2),
+
+        "RMSE Increase": round(temp_rmse - rmse_model1, 2),
+
+        "MAE Without Group": round(temp_mae, 2),
+
+        "MAE Increase": round(temp_mae - mae_model1, 2)
+
+    })
+
+ablation_df_model1 = pd.DataFrame(ablation_results_model1).sort_values("R² Drop", ascending=False)
+
+display(ablation_df_model1)
+
+```
+
+The ablation results guide the design of Model 2. Feature groups with larger R² drops are kept or improved, while weak feature groups are removed or treated as lower priority.
+
+## Model 2: Improved Multiple Linear Regression
+
+Model 2 improves the baseline model by adding occupation group and specialized occupation, using cleaned education categories, keeping the top 30 grouped job titles to limit overfitting, and focusing on stronger predictors. Employment type and AI-related status are removed from Model 2 because they showed very small contribution in the ablation results.
+
+```{python}
+
+#| echo: false
+
+#| warning: false
+
+#| message: false
+
+# Load prepared model-ready dataset from data_cleaning.qmd
+
+df_model2_base = spark.read.parquet("data/prepared/salary_regression_data.parquet")
+
+df_model2_base = df_model2_base.join(
+
+    skill_count_features_df,
+
+    df_model2_base.id == skill_count_features_df.job_id,
+
+    how="left"
+
+).drop("job_id")
+
+# Add education level from cleaned dataset
+
+education_df_model2 = (
+
+    spark.read.parquet("data/cleaned/lightcast_cleaned.parquet")
+
+    .select(
+
+        col("ID").alias("id"),
+
+        col("EDUCATION_LEVELS_NAME").alias("education_level")
+
+    )
+
+    .dropDuplicates(["id"])
+
+)
+
+df_model2_base = (
+
+    df_model2_base
+
+    .join(education_df_model2, on="id", how="left")
+
+    .withColumn(
+
+        "education_level",
+
+        trim(
+
+            regexp_replace(
+
+                regexp_replace(col("education_level"), r"[\n\r]", " "),
+
+                r"\s+",
+
+                " "
+
+            )
+
+        )
+
+    )
+
+    .fillna({"education_level": "Unknown"})
+
+)
+
+# Clean education into simpler categories
+
+df_model2_base = df_model2_base.withColumn(
+
+    "education_level_clean",
+
+    when(lower(col("education_level")).contains("ph.d"), "PhD / Professional")
+
+    .when(lower(col("education_level")).contains("professional degree"), "PhD / Professional")
+
+    .when(lower(col("education_level")).contains("master"), "Master")
+
+    .when(lower(col("education_level")).contains("bachelor"), "Bachelor")
+
+    .when(lower(col("education_level")).contains("associate"), "Associate")
+
+    .when(lower(col("education_level")).contains("high school"), "High School / GED")
+
+    .otherwise("Unknown")
+
+)
+
+# Keep only valid salary rows
+
+df_salary2 = df_model2_base.filter(
+
+    col("salary").isNotNull() &
+
+    (col("salary") > 0) &
+
+    (col("salary") <= 500000)
+
+).cache()
+
+# Keep top 30 job titles to avoid too many sparse dummy variables
+
+top_titles_model2 = [
+
+    r["title_clean"] for r in
+
+    df_salary2.groupBy("title_clean")
+
+    .agg(spark_count("*").alias("cnt"))
+
+    .orderBy(col("cnt").desc())
+
+    .limit(30)
+
+    .collect()
+
+]
+
+df_model2 = df_salary2.withColumn(
+
+    "title_grouped",
+
+    when(col("title_clean").isin(top_titles_model2), col("title_clean")).otherwise("Other")
+
+)
+
+# Focused skill features
+
+skill_cols_model2 = [
+
+    "has_python",
+
+    "has_sql",
+
+    "has_machine_learning",
+
+    "has_tableau",
+
+    "has_power_bi",
+
+    "has_aws",
+
+    "has_excel",
+
+    "has_sap",
+
+    "specialized_skill_count",
+
+    "software_skill_count"
+
+]
+
+# Select Model 2 features
+
+# Select Model 2 features
+df_model2 = (
+    df_model2
     .select(
         ["salary",
          "state_name",
          "title_grouped",
+         "occupation_group_name",
+         "specialized_occupation_name",
          "remote_type_name",
          "employment_type_name",
          "min_years_experience",
-         "education_level"] + skill_cols
+         "education_level_clean",
+         "is_ai_related"] + skill_cols_model2
     )
     .fillna({
-    "state_name": "Unknown",
-    "title_grouped": "Other",
-    "remote_type_name": "Unknown",
-    "employment_type_name": "Unknown",
-    "min_years_experience": 0,
-    "education_level": "Unknown",
-    "has_python": 0,
-    "has_sql": 0,
-    "has_machine_learning": 0,
-    "has_tableau": 0,
-    "has_power_bi": 0,
-    "has_aws": 0,
-    "has_excel": 0,
-    "has_sap": 0,
-    "common_skill_count": 0,
-    "specialized_skill_count": 0,
-    "software_skill_count": 0
+        "state_name": "Unknown",
+        "title_grouped": "Other",
+        "occupation_group_name": "Unknown",
+        "specialized_occupation_name": "Unknown",
+        "remote_type_name": "Unknown",
+        "employment_type_name": "Unknown",
+        "min_years_experience": 0,
+        "education_level_clean": "Unknown",
+        "is_ai_related": 0,
+        "has_python": 0,
+        "has_sql": 0,
+        "has_machine_learning": 0,
+        "has_tableau": 0,
+        "has_power_bi": 0,
+        "has_aws": 0,
+        "has_excel": 0,
+        "has_sap": 0,
+        "specialized_skill_count": 0,
+        "software_skill_count": 0
     })
-.cache())
+    .cache()
+)
 
-print("Model rows:", df_model.count())
-print("Top 30 grouped titles:", top_titles[:10], "...")
+print("Model 2 rows:", df_model2.count())
 
-# Categorical encoders
-title_indexer = StringIndexer(
+print("Model 2 top 30 grouped titles:", top_titles_model2[:10], "...")
+
+# Model 2 categorical encoders
+
+title_indexer_model2 = StringIndexer(
+
     inputCol="title_grouped",
+
     outputCol="title_idx",
+
     handleInvalid="keep"
+
 )
-title_encoder = OneHotEncoder(
+
+title_encoder_model2 = OneHotEncoder(
+
     inputCol="title_idx",
+
     outputCol="title_vec",
+
     dropLast=False
+
 )
 
-state_indexer = StringIndexer(
+occupation_group_indexer_model2 = StringIndexer(
+
+    inputCol="occupation_group_name",
+
+    outputCol="occupation_group_idx",
+
+    handleInvalid="keep"
+
+)
+
+occupation_group_encoder_model2 = OneHotEncoder(
+
+    inputCol="occupation_group_idx",
+
+    outputCol="occupation_group_vec",
+
+    dropLast=False
+
+)
+
+specialized_occupation_indexer_model2 = StringIndexer(
+
+    inputCol="specialized_occupation_name",
+
+    outputCol="specialized_occupation_idx",
+
+    handleInvalid="keep"
+
+)
+
+specialized_occupation_encoder_model2 = OneHotEncoder(
+
+    inputCol="specialized_occupation_idx",
+
+    outputCol="specialized_occupation_vec",
+
+    dropLast=False
+
+)
+
+state_indexer_model2 = StringIndexer(
+
     inputCol="state_name",
+
     outputCol="state_idx",
+
     handleInvalid="keep"
+
 )
-state_encoder = OneHotEncoder(
+
+state_encoder_model2 = OneHotEncoder(
+
     inputCol="state_idx",
+
     outputCol="state_vec",
+
     dropLast=False
+
 )
 
-remote_indexer = StringIndexer(
+remote_indexer_model2 = StringIndexer(
+
     inputCol="remote_type_name",
+
     outputCol="remote_idx",
+
     handleInvalid="keep"
-)
-remote_encoder = OneHotEncoder(
-    inputCol="remote_idx",
-    outputCol="remote_vec",
-    dropLast=False
+
 )
 
-employment_indexer = StringIndexer(
+remote_encoder_model2 = OneHotEncoder(
+
+    inputCol="remote_idx",
+
+    outputCol="remote_vec",
+
+    dropLast=False
+
+)
+employment_indexer_model2 = StringIndexer(
     inputCol="employment_type_name",
     outputCol="employment_idx",
     handleInvalid="keep"
 )
-employment_encoder = OneHotEncoder(
+
+employment_encoder_model2 = OneHotEncoder(
     inputCol="employment_idx",
     outputCol="employment_vec",
     dropLast=False
 )
 
-education_indexer = StringIndexer(
-    inputCol="education_level",
+education_indexer_model2 = StringIndexer(
+
+    inputCol="education_level_clean",
+
     outputCol="education_idx",
+
     handleInvalid="keep"
-)
-education_encoder = OneHotEncoder(
-    inputCol="education_idx",
-    outputCol="education_vec",
-    dropLast=False
+
 )
 
-assembler = VectorAssembler(
+education_encoder_model2 = OneHotEncoder(
+
+    inputCol="education_idx",
+
+    outputCol="education_vec",
+
+    dropLast=False
+
+)
+
+assembler_model2 = VectorAssembler(
     inputCols=[
         "title_vec",
+        "occupation_group_vec",
+        "specialized_occupation_vec",
         "state_vec",
         "remote_vec",
         "employment_vec",
         "education_vec",
-        "min_years_experience"
-    ] + skill_cols,
+        "min_years_experience",
+        "is_ai_related"
+    ] + skill_cols_model2,
     outputCol="features"
 )
 
-lr = LinearRegression(
+lr_model2_estimator = LinearRegression(
+
     featuresCol="features",
+
     labelCol="salary"
+
 )
 
-pipeline = Pipeline(stages=[
-    title_indexer, title_encoder,
-    state_indexer, state_encoder,
-    remote_indexer, remote_encoder,
-    employment_indexer, employment_encoder,
-    education_indexer, education_encoder,
-    assembler, lr
+pipeline_model2 = Pipeline(stages=[
+    title_indexer_model2, title_encoder_model2,
+    occupation_group_indexer_model2, occupation_group_encoder_model2,
+    specialized_occupation_indexer_model2, specialized_occupation_encoder_model2,
+    state_indexer_model2, state_encoder_model2,
+    remote_indexer_model2, remote_encoder_model2,
+    employment_indexer_model2, employment_encoder_model2,
+    education_indexer_model2, education_encoder_model2,
+    assembler_model2, lr_model2_estimator
 ])
 
-train, test = df_model.randomSplit([0.8, 0.2], seed=42)
+train_model2, test_model2 = df_model2.randomSplit([0.8, 0.2], seed=42)
 
-model = pipeline.fit(train)
-predictions = model.transform(test)
+model2 = pipeline_model2.fit(train_model2)
 
-# Metrics
-r2 = RegressionEvaluator(
+predictions_model2 = model2.transform(test_model2)
+
+# Model 2 metrics
+
+r2_model2 = RegressionEvaluator(
+
     labelCol="salary",
+
     predictionCol="prediction",
+
     metricName="r2"
-).evaluate(predictions)
 
-rmse = RegressionEvaluator(
+).evaluate(predictions_model2)
+
+rmse_model2 = RegressionEvaluator(
+
     labelCol="salary",
+
     predictionCol="prediction",
+
     metricName="rmse"
-).evaluate(predictions)
 
-mae = RegressionEvaluator(
+).evaluate(predictions_model2)
+
+mae_model2 = RegressionEvaluator(
+
     labelCol="salary",
+
     predictionCol="prediction",
+
     metricName="mae"
-).evaluate(predictions)
 
-lr_model = model.stages[-1]
-n = predictions.count()
-p = len(lr_model.coefficients)
+).evaluate(predictions_model2)
 
-adjusted_r2 = 1 - ((1 - r2) * (n - 1) / (n - p - 1)) if n > p + 1 else None
+lr_model2 = model2.stages[-1]
 
-metrics_df = pd.DataFrame({
-    "Metric": ["R²", "Adjusted R²", "RMSE", "MAE"],
-    "Value": [
-        round(r2, 4),
-        round(adjusted_r2, 4) if adjusted_r2 is not None else None,
-        round(rmse, 2),
-        round(mae, 2)
-    ]
-})
+n_model2 = predictions_model2.count()
 
-display(metrics_df)
+p_model2 = len(lr_model2.coefficients)
 
-# Coefficient table
-coefficients = lr_model.coefficients.toArray()
+adjusted_r2_model2 = (
 
-title_labels = list(model.stages[0].labels) + ["title_unseen"]
-state_labels = list(model.stages[2].labels) + ["state_unseen"]
-remote_labels = list(model.stages[4].labels) + ["remote_unseen"]
-employment_labels = list(model.stages[6].labels) + ["employment_unseen"]
-education_labels = list(model.stages[8].labels) + ["education_unseen"]
+    1 - ((1 - r2_model2) * (n_model2 - 1) / (n_model2 - p_model2 - 1))
 
-feature_names = (
-    ["Title: " + x for x in title_labels] +
-    ["State: " + x for x in state_labels] +
-    ["Remote: " + x for x in remote_labels] +
-    ["Employment: " + x for x in employment_labels] +
-    ["Education: " + x for x in education_labels] +
-    ["Minimum Years Experience"] +
-    ["Skill: " + x.replace("has_", "").replace("_", " ").title() for x in skill_cols]
+    if n_model2 > p_model2 + 1
+
+    else None
+
 )
 
-feature_names = feature_names[:len(coefficients)]
+metrics_df_model2 = pd.DataFrame({
 
-coef_df = pd.DataFrame({
-    "Feature": feature_names,
-    "Coefficient": coefficients
+    "Metric": ["R²", "Adjusted R²", "RMSE", "MAE"],
+
+    "Value": [
+
+        round(r2_model2, 4),
+
+        round(adjusted_r2_model2, 4) if adjusted_r2_model2 is not None else None,
+
+        round(rmse_model2, 2),
+
+        round(mae_model2, 2)
+
+    ]
+
 })
 
-coef_df = coef_df[
-    ~coef_df["Feature"].str.contains("unseen", case=False, na=False)
+display(metrics_df_model2)
+
+# Model 2 coefficient table
+coefficients_model2 = lr_model2.coefficients.toArray()
+
+title_labels_model2 = list(model2.stages[0].labels) + ["title_unseen"]
+occupation_group_labels_model2 = list(model2.stages[2].labels) + ["occupation_group_unseen"]
+specialized_occupation_labels_model2 = list(model2.stages[4].labels) + ["specialized_occupation_unseen"]
+state_labels_model2 = list(model2.stages[6].labels) + ["state_unseen"]
+remote_labels_model2 = list(model2.stages[8].labels) + ["remote_unseen"]
+employment_labels_model2 = list(model2.stages[10].labels) + ["employment_unseen"]
+education_labels_model2 = list(model2.stages[12].labels) + ["education_unseen"]
+
+feature_names_model2 = (
+    ["Title: " + x for x in title_labels_model2] +
+    ["Occupation Group: " + x for x in occupation_group_labels_model2] +
+    ["Specialized Occupation: " + x for x in specialized_occupation_labels_model2] +
+    ["State: " + x for x in state_labels_model2] +
+    ["Remote: " + x for x in remote_labels_model2] +
+    ["Employment: " + x for x in employment_labels_model2] +
+    ["Education: " + x for x in education_labels_model2] +
+    ["Minimum Years Experience"] +
+    ["Is AI Related"] +
+    ["Skill: " + x.replace("has_", "").replace("_", " ").title() for x in skill_cols_model2]
+)
+
+feature_names_model2 = feature_names_model2[:len(coefficients_model2)]
+
+coef_df_model2 = pd.DataFrame({
+
+    "Feature": feature_names_model2,
+
+    "Coefficient": coefficients_model2
+
+})
+
+coef_df_model2 = coef_df_model2[
+
+    ~coef_df_model2["Feature"].str.contains("unseen", case=False, na=False)
+
 ].sort_values("Coefficient", ascending=False)
 
-print("\n=== Salary Impact by Feature ===")
-display(coef_df)
+print("\n=== Model 2: Salary Impact by Feature ===")
 
-print(f"\nIntercept: ${lr_model.intercept:,.0f}")
-print(f"Test R²: {r2:.4f}")
-print(f"Test Adjusted R²: {adjusted_r2:.4f}" if adjusted_r2 is not None else "Adjusted R²: not available")
+display(coef_df_model2)
+
+print(f"\nModel 2 Intercept: ${lr_model2.intercept:,.0f}")
+
+print(f"Model 2 Test R²: {r2_model2:.4f}")
+
+print(
+
+    f"Model 2 Test Adjusted R²: {adjusted_r2_model2:.4f}"
+
+    if adjusted_r2_model2 is not None
+
+    else "Model 2 Adjusted R²: not available"
+
+)
+
 ```
 
-## Which Features Impact Salary?
+
+## Model Comparison
+
 ```{python}
+
 #| echo: false
+
 #| warning: false
+
 #| message: false
 
-coef_plot_df = coef_df.copy()
-coef_plot_df["abs_coef"] = coef_plot_df["Coefficient"].abs()
+comparison_df = pd.DataFrame({
 
-top_coef_plot = (
-    coef_plot_df
-    .sort_values("abs_coef", ascending=False)
-    .head(20)
-    .sort_values("Coefficient")
-    .copy()
-)
+    "Model": ["Model 1: Baseline MLR", "Model 2: Improved MLR"],
 
-top_coef_plot["direction"] = top_coef_plot["Coefficient"].apply(
-    lambda x: "Positive salary association" if x > 0 else "Negative salary association"
-)
+    "R²": [
 
-top_coef_plot["label"] = top_coef_plot["Coefficient"].apply(
-    lambda x: f"${x:,.0f}"
-)
+        round(r2_model1, 4),
 
-def shorten_feature_name(x):
-    if x.startswith("Education: "):
-        x = x.replace("Education: ", "Edu: ")
-        x = x.replace("High school or GED", "HS/GED")
-        x = x.replace("Associate degree", "Assoc.")
-        x = x.replace("Bachelor's degree", "Bachelor")
-        x = x.replace("Master's degree", "Master")
-        x = x.replace("Ph.D. or professional degree", "PhD")
-        x = x.replace(", ", " + ")
+        round(r2_model2, 4)
 
-    if x.startswith("Title: "):
-        title = x.replace("Title: ", "")
-        if len(title) > 42:
-            title = title[:42] + "..."
-        x = "Title: " + title
+    ],
 
-    if len(x) > 70:
-        x = x[:70] + "..."
+    "Adjusted R²": [
 
-    return x
+        round(adjusted_r2_model1, 4) if adjusted_r2_model1 is not None else None,
 
-top_coef_plot["Feature_short"] = top_coef_plot["Feature"].apply(shorten_feature_name)
+        round(adjusted_r2_model2, 4) if adjusted_r2_model2 is not None else None
 
-# Make y-axis labels unique so Plotly does not stack duplicate labels
-top_coef_plot["Feature_display"] = top_coef_plot.apply(
-    lambda r: f"{r['Feature_short']}  ({r['label']})",
-    axis=1
-)
+    ],
 
-fig_coef = px.bar(
-    top_coef_plot,
-    x="Coefficient",
-    y="Feature_display",
-    color="direction",
-    orientation="h",
-    title="Top Salary Predictors by Absolute Coefficient",
-    labels={
-        "Coefficient": "Estimated Salary Impact ($)",
-        "Feature_display": ""
-    },
-    color_discrete_map={
-        "Positive salary association": "#2ca02c",
-        "Negative salary association": "#d62728"
-    },
-    hover_data={
-        "Feature": True,
-        "Coefficient": ":,.0f",
-        "direction": False,
-        "Feature_short": False,
-        "Feature_display": False,
-        "label": False,
-        "abs_coef": False
-    }
-)
+    "RMSE": [
 
-fig_coef.update_layout(
-    template="plotly_white",
-    height=900,
-    width=1150,
-    margin=dict(l=520, r=80, t=90, b=70),
-    showlegend=True,
-    legend=dict(
-        orientation="h",
-        yanchor="bottom",
-        y=1.03,
-        xanchor="right",
-        x=1
-    ),
-    title=dict(x=0.02, xanchor="left"),
-    xaxis=dict(
-        title="Estimated Salary Impact ($)",
-        tickprefix="$",
-        separatethousands=True,
-        gridcolor="rgba(0,0,0,0.08)"
-    ),
-    yaxis=dict(
-        title="",
-        automargin=True
-    )
-)
+        round(rmse_model1, 2),
 
-fig_coef.show()
+        round(rmse_model2, 2)
+
+    ],
+
+    "MAE": [
+
+        round(mae_model1, 2),
+
+        round(mae_model2, 2)
+
+    ]
+
+})
+
+display(comparison_df)
+
 ```
 
 ### Try different job features and skills to see how each feature changes predicted salary.
@@ -436,49 +1270,73 @@ fig_coef.show()
 #| results: asis
 
 import json
-from html import escape
 from IPython.display import HTML
 
-# Collect simple option lists
-state_options = sorted([x for x in df_model.select("state_name").distinct().toPandas()["state_name"].dropna().tolist()])
-title_options = sorted([x for x in df_model.select("title_grouped").distinct().toPandas()["title_grouped"].dropna().tolist()])
-remote_options = sorted([x for x in df_model.select("remote_type_name").distinct().toPandas()["remote_type_name"].dropna().tolist()])
-employment_options = sorted([x for x in df_model.select("employment_type_name").distinct().toPandas()["employment_type_name"].dropna().tolist()])
-education_options = sorted([x for x in df_model.select("education_level").distinct().toPandas()["education_level"].dropna().tolist()])
+# Collect option lists from Model 2
+state_options = sorted([
+    x for x in df_model2.select("state_name").distinct().toPandas()["state_name"].dropna().tolist()
+])
 
-# Create coefficient lookup
-coef_lookup = dict(zip(feature_names, coefficients))
+title_options = sorted([
+    x for x in df_model2.select("title_grouped").distinct().toPandas()["title_grouped"].dropna().tolist()
+])
+
+occupation_group_options = sorted([
+    x for x in df_model2.select("occupation_group_name").distinct().toPandas()["occupation_group_name"].dropna().tolist()
+])
+
+specialized_occupation_options = sorted([
+    x for x in df_model2.select("specialized_occupation_name").distinct().toPandas()["specialized_occupation_name"].dropna().tolist()
+])
+
+remote_options = sorted([
+    x for x in df_model2.select("remote_type_name").distinct().toPandas()["remote_type_name"].dropna().tolist()
+])
+
+education_options = sorted([
+    x for x in df_model2.select("education_level_clean").distinct().toPandas()["education_level_clean"].dropna().tolist()
+])
+
+employment_options = sorted([
+    x for x in df_model2.select("employment_type_name").distinct().toPandas()["employment_type_name"].dropna().tolist()
+])
+# Create coefficient lookup from Model 2
+coef_lookup_model2 = dict(zip(feature_names_model2, coefficients_model2))
 
 payload = {
-    "intercept": float(lr_model.intercept),
-    "coef": {k: float(v) for k, v in coef_lookup.items()},
+    "intercept": float(lr_model2.intercept),
+    "coef": {k: float(v) for k, v in coef_lookup_model2.items()},
     "states": state_options,
     "titles": title_options,
+    "occupation_groups": occupation_group_options,
+    "specialized_occupations": specialized_occupation_options,
     "remotes": remote_options,
     "employments": employment_options,
     "educations": education_options,
     "skills": [
-    "has_python",
-    "has_sql",
-    "has_machine_learning",
-    "has_tableau",
-    "has_power_bi",
-    "has_aws",
-    "has_excel",
-    "has_sap"
-]
+        "has_python",
+        "has_sql",
+        "has_machine_learning",
+        "has_tableau",
+        "has_power_bi",
+        "has_aws",
+        "has_excel",
+        "has_sap"
+    ]
 }
 
 payload_json = json.dumps(payload)
 
 html = f"""
-<div id="salary-widget" style="border:1px solid #ddd; border-radius:12px; padding:18px; max-width:850px; font-family:Arial, sans-serif;">
-  <h3 style="margin-top:0;">Salary Prediction Feature Explorer</h3>
-  <p style="color:#555;">Select job characteristics and toggle skills to see how model features change predicted salary.</p>
+<div id="salary-widget" style="border:1px solid #ddd; border-radius:12px; padding:18px; max-width:900px; font-family:Arial, sans-serif;">
+  <h3 style="margin-top:0;">Model 2 Salary Prediction Feature Explorer</h3>
+  <p style="color:#555;">Select job characteristics and toggle skills to see how Model 2 features change predicted salary.</p>
 
   <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
     <label>State<br><select id="sw-state" style="width:100%; padding:6px;"></select></label>
     <label>Job Title Group<br><select id="sw-title" style="width:100%; padding:6px;"></select></label>
+    <label>Occupation Group<br><select id="sw-occupation-group" style="width:100%; padding:6px;"></select></label>
+    <label>Specialized Occupation<br><select id="sw-specialized-occupation" style="width:100%; padding:6px;"></select></label>
     <label>Remote Type<br><select id="sw-remote" style="width:100%; padding:6px;"></select></label>
     <label>Employment Type<br><select id="sw-employment" style="width:100%; padding:6px;"></select></label>
     <label>Education Level<br><select id="sw-education" style="width:100%; padding:6px;"></select></label>
@@ -494,6 +1352,13 @@ html = f"""
     <div id="sw-factors" style="margin-top:12px; font-size:14px;"></div>
   </div>
 </div>
+
+<label>AI Related Job<br>
+  <select id="sw-ai" style="width:100%; padding:6px;">
+    <option value="0">No</option>
+    <option value="1">Yes</option>
+  </select>
+</label>
 
 <script>
 const salaryModel = {payload_json};
@@ -532,17 +1397,23 @@ function updatePrediction() {{
 
   const state = document.getElementById("sw-state").value;
   const title = document.getElementById("sw-title").value;
+  const occupationGroup = document.getElementById("sw-occupation-group").value;
+  const specializedOccupation = document.getElementById("sw-specialized-occupation").value;
   const remote = document.getElementById("sw-remote").value;
-  const employment = document.getElementById("sw-employment").value;
   const education = document.getElementById("sw-education").value;
   const years = parseFloat(document.getElementById("sw-years").value || "0");
+  const employment = document.getElementById("sw-employment").value;
+  const isAI = parseFloat(document.getElementById("sw-ai").value || "0");
 
   const featureKeys = [
     "State: " + state,
     "Title: " + title,
+    "Occupation Group: " + occupationGroup,
+    "Specialized Occupation: " + specializedOccupation,
     "Remote: " + remote,
-    "Employment: " + employment,
     "Education: " + education
+    "Employment: " + employment,
+    "Is AI Related: " + isAI
   ];
 
   featureKeys.forEach(k => {{
@@ -554,6 +1425,9 @@ function updatePrediction() {{
   const yearCoef = salaryModel.coef["Minimum Years Experience"] || 0;
   pred += yearCoef * years;
   if (Math.abs(yearCoef * years) > 1) factors.push(["Minimum Years Experience", yearCoef * years]);
+  const aiCoef = salaryModel.coef["Is AI Related"] || 0;
+pred += aiCoef * isAI;
+if (Math.abs(aiCoef * isAI) > 1) factors.push(["Is AI Related", aiCoef * isAI]);
 
   salaryModel.skills.forEach(s => {{
     const box = document.getElementById("sw-" + s);
@@ -580,9 +1454,12 @@ function updatePrediction() {{
 
 addOptions("sw-state", salaryModel.states);
 addOptions("sw-title", salaryModel.titles);
+addOptions("sw-occupation-group", salaryModel.occupation_groups);
+addOptions("sw-specialized-occupation", salaryModel.specialized_occupations);
 addOptions("sw-remote", salaryModel.remotes);
-addOptions("sw-employment", salaryModel.employments);
 addOptions("sw-education", salaryModel.educations);
+addOptions("sw-employment", salaryModel.employments);
+addOptions("sw-ai", ["0", "1"]);
 
 const skillsDiv = document.getElementById("sw-skills");
 salaryModel.skills.forEach(s => {{
