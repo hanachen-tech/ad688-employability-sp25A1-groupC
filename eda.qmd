@@ -19,26 +19,33 @@ execute:
 
 ## Overview
 
-This page explores the cleaned Lightcast job postings dataset created in the data preparation step. The purpose of this exploratory analysis is to understand the overall size of the dataset, salary availability, remote-work categories, geographic distribution, and industry distribution before moving into the main research analysis.
+This page explores the cleaned Lightcast job postings dataset created during the data preparation step. The purpose of this exploratory analysis is to understand the dataset size, salary availability, missing salary patterns, remote-work categories, geographic concentration, industry concentration, occupation mix, and skill demand before moving into the main salary analysis.
 
 ## 1. Load Cleaned Data
 
 ```{python}
-#| echo: true
+#| echo: false
 #| warning: false
 #| message: false
 
 from pyspark.sql import SparkSession
+from pyspark.sql.functions import col
 from IPython.display import display
 import pandas as pd
 import plotly.express as px
 
-spark = SparkSession.builder \
-    .config("spark.driver.host", "localhost") \
-    .appName("EDAJobMarket") \
+spark = (
+    SparkSession.builder
+    .config("spark.driver.host", "localhost")
+    .config("spark.driver.memory", "2g")
+    .config("spark.executor.memory", "2g")
+    .config("spark.sql.shuffle.partitions", "8")
+    .appName("EDAJobMarket")
     .getOrCreate()
+)
 
 spark.catalog.clearCache()
+spark.sparkContext.setLogLevel("ERROR")
 
 # Load prepared tables created by data_cleaning.qmd
 job_postings_df = spark.read.parquet("data/prepared/job_postings.parquet")
@@ -52,6 +59,19 @@ ai_job_ids = spark.read.parquet("data/prepared/ai_job_ids.parquet")
 jobs_with_ai = spark.read.parquet("data/prepared/jobs_with_ai.parquet")
 salary_regression_data = spark.read.parquet("data/prepared/salary_regression_data.parquet")
 salary_classification_data = spark.read.parquet("data/prepared/salary_classification_data.parquet")
+
+from pyspark.sql.functions import col
+
+education_df = (
+    spark.read.parquet("data/cleaned/lightcast_cleaned.parquet")
+    .select(
+        col("ID").alias("id"),
+        col("EDUCATION_LEVELS_NAME").alias("education_level")
+    )
+    .dropDuplicates(["id"])
+)
+
+education_df.createOrReplaceTempView("education_levels")
 
 # Register Spark SQL views
 job_postings_df.createOrReplaceTempView("job_postings")
@@ -99,35 +119,13 @@ print("Regression-ready rows:", salary_regression_data.count())
 print("Classification-ready rows:", salary_classification_data.count())
 ```
 
-## 2. Preview Cleaned Dataset
+## 2. Cleaned Dataset Summary
+
+Why this table was chosen:  
+This summary provides a high-level view of the cleaned dataset before deeper analysis. It shows the scale of the job posting data, including the number of postings, companies, locations, industries, and occupations.
 
 ```{python}
-#| echo: true
-#| warning: false
-#| message: false
-
-preview_df = job_postings_df.select(
-    "id",
-    "title_clean",
-    "company_id",
-    "industry_id",
-    "occupation_id",
-    "location_id",
-    "employment_type_name",
-    "remote_type_name",
-    "observed_analysis_salary",
-    "salary",
-    "salary_imputation_status",
-    "posted_date"
-).limit(10).toPandas()
-
-display(style_table(preview_df))
-```
-
-## 3. Cleaned Dataset Summary
-
-```{python}
-#| echo: true
+#| echo: false
 #| warning: false
 #| message: false
 
@@ -151,54 +149,23 @@ display(style_table(summary, {
     "unique_occupations": "{:,.0f}"
 }))
 ```
-## 4. Validate Prepared Tables
-```{python}
-#| echo: true
-#| warning: false
-#| message: false
 
-table_counts = spark.sql("""
-SELECT 'job_postings' AS table_name, COUNT(*) AS row_count FROM job_postings
-UNION ALL
-SELECT 'companies' AS table_name, COUNT(*) AS row_count FROM companies
-UNION ALL
-SELECT 'industries' AS table_name, COUNT(*) AS row_count FROM industries
-UNION ALL
-SELECT 'locations' AS table_name, COUNT(*) AS row_count FROM locations
-UNION ALL
-SELECT 'occupations' AS table_name, COUNT(*) AS row_count FROM occupations
-UNION ALL
-SELECT 'skills' AS table_name, COUNT(*) AS row_count FROM skills
-UNION ALL
-SELECT 'job_skill_matches' AS table_name, COUNT(*) AS row_count FROM job_skill_matches
-UNION ALL
-SELECT 'ai_job_ids' AS table_name, COUNT(*) AS row_count FROM ai_job_ids
-UNION ALL
-SELECT 'jobs_with_ai' AS table_name, COUNT(*) AS row_count FROM jobs_with_ai
-UNION ALL
-SELECT 'salary_regression_data' AS table_name, COUNT(*) AS row_count FROM salary_regression_data
-UNION ALL
-SELECT 'salary_classification_data' AS table_name, COUNT(*) AS row_count FROM salary_classification_data
-""").toPandas()
+**Key insight:** The cleaned dataset contains 72,476 job postings across 12,302 companies, 4,837 locations, 814 industries, and 11 occupation categories. This provides broad coverage of the job market, but the salary analysis depends on the smaller subset of postings with usable salary information.
 
-display(style_table(table_counts, {
-    "row_count": "{:,.0f}"
-}))
-```
-## 5. Salary Availability After Imputation
+## 3. Salary Availability in the Dataset
 
-This section checks salary coverage using `ANALYSIS_SALARY_INDUSTRY_IMPUTED`, which combines observed salary values with qualified industry-median imputed salary values. This variable is used as the main salary variable for later salary-based analysis.
+Why this visualization was chosen:  
+Salary is the main compensation variable in this project, so the first step is to understand how many postings have usable salary information after imputation.
 
 ```{python}
-#| echo: true
+#| echo: false
 #| warning: false
 #| message: false
 
 salary_availability = spark.sql("""
 SELECT
     CASE
-        WHEN salary IS NOT NULL
-             AND salary > 0
+        WHEN salary IS NOT NULL AND salary > 0
         THEN 'Salary Available'
         ELSE 'Salary Missing'
     END AS salary_status,
@@ -207,8 +174,7 @@ SELECT
 FROM job_postings
 GROUP BY
     CASE
-        WHEN salary IS NOT NULL
-             AND salary > 0
+        WHEN salary IS NOT NULL AND salary > 0
         THEN 'Salary Available'
         ELSE 'Salary Missing'
     END
@@ -222,7 +188,7 @@ display(style_table(salary_availability, {
 ```
 
 ```{python}
-#| echo: true
+#| echo: false
 #| warning: false
 #| message: false
 
@@ -262,14 +228,15 @@ fig_salary.update_layout(
 fig_salary.show()
 ```
 
-**Insight:** After industry-median imputation, 39,244 postings have usable salary values and 33,232 postings remain missing salary. This increases the salary sample size compared with the original `ANALYSIS_SALARY` variable, which had 32,394 observed salary values.
+**Key insight:** After industry-median imputation, 39,244 postings have usable salary values, representing 54.15% of the cleaned dataset. However, 33,232 postings still have missing salary values, so salary-based results should be interpreted as applying to the salary-available portion of the dataset rather than the full job market.
 
-## Salary Missingness Bias Check
+## 4. Salary Missingness Across Job Characteristics
 
-This section checks whether salary availability still differs across important groups after using the imputed salary variable. This helps identify whether salary-based results may still be affected by missing salary patterns.
+Why this analysis was chosen:  
+Salary availability may not be random. This section checks whether salary missingness differs across AI-related status, remote-work type, state, and industry. These patterns are important because uneven missingness can affect later salary interpretation.
 
 ```{python}
-#| echo: true
+#| echo: false
 #| warning: false
 #| message: false
 
@@ -304,10 +271,9 @@ display(style_table(salary_missing_by_ai, {
     "missing_salary_percent": "{:.2f}%"
 }))
 
-
 salary_missing_by_remote = spark.sql("""
 SELECT
-    remote_type_name AS remote_type,
+    COALESCE(remote_type_name, 'Unknown') AS remote_type,
     COUNT(DISTINCT id) AS total_postings,
     COUNT(DISTINCT CASE
         WHEN salary IS NOT NULL AND salary > 0
@@ -325,8 +291,7 @@ SELECT
         2
     ) AS missing_salary_percent
 FROM job_postings
-WHERE remote_type_name IS NOT NULL
-GROUP BY remote_type_name
+GROUP BY COALESCE(remote_type_name, 'Unknown')
 ORDER BY missing_salary_percent DESC
 """).toPandas()
 
@@ -336,7 +301,6 @@ display(style_table(salary_missing_by_remote, {
     "salary_missing": "{:,.0f}",
     "missing_salary_percent": "{:.2f}%"
 }))
-
 
 salary_missing_by_state = spark.sql("""
 SELECT
@@ -364,7 +328,7 @@ WHERE l.state_name IS NOT NULL
 GROUP BY l.state_name
 HAVING COUNT(DISTINCT j.id) >= 100
 ORDER BY missing_salary_percent DESC
-LIMIT 20
+LIMIT 10
 """).toPandas()
 
 display(style_table(salary_missing_by_state, {
@@ -373,51 +337,206 @@ display(style_table(salary_missing_by_state, {
     "salary_missing": "{:,.0f}",
     "missing_salary_percent": "{:.2f}%"
 }))
-
-
-salary_missing_by_industry = spark.sql("""
-SELECT
-    i.naics_2022_6_name AS industry,
-    COUNT(DISTINCT j.id) AS total_postings,
-    COUNT(DISTINCT CASE
-        WHEN j.salary IS NOT NULL AND j.salary > 0
-        THEN j.id
-    END) AS salary_available,
-    COUNT(DISTINCT CASE
-        WHEN j.salary IS NULL OR j.salary <= 0
-        THEN j.id
-    END) AS salary_missing,
-    ROUND(
-        COUNT(DISTINCT CASE
-            WHEN j.salary IS NULL OR j.salary <= 0
-            THEN j.id
-        END) / COUNT(DISTINCT j.id) * 100,
-        2
-    ) AS missing_salary_percent
-FROM job_postings j
-LEFT JOIN industries i
-    ON j.industry_id = i.industry_id
-WHERE i.naics_2022_6_name IS NOT NULL
-GROUP BY i.naics_2022_6_name
-HAVING COUNT(DISTINCT j.id) >= 100
-ORDER BY missing_salary_percent DESC
-LIMIT 20
-""").toPandas()
-
-display(style_table(salary_missing_by_industry, {
-    "total_postings": "{:,.0f}",
-    "salary_available": "{:,.0f}",
-    "salary_missing": "{:,.0f}",
-    "missing_salary_percent": "{:.2f}%"
-}))
 ```
 
-**Insight:** Salary missingness remains important even after industry-median imputation. The imputed salary variable improves coverage, but missingness can still vary by AI classification, remote type, state, and industry. Salary-based results should therefore be interpreted with this remaining missingness in mind.
+**Key insight:** Salary missingness is not evenly distributed across job characteristics. AI-related postings have a higher missing salary rate than non-AI postings, and missingness also varies by remote-work category and state. This suggests that salary availability may be affected by job type, location, and posting characteristics, which should be considered when interpreting later salary results.
 
-## 6. Remote Type Distribution
+## 5. Salary Distribution in the Dataset
+
+Why this visualization was chosen:  
+Salary is the main compensation variable in this project. A histogram helps show whether salary values are concentrated in a common range or affected by high-end outliers.
 
 ```{python}
-#| echo: true
+#| echo: false
+#| warning: false
+#| message: false
+
+salary_distribution = spark.sql("""
+SELECT
+    salary
+FROM job_postings
+WHERE salary IS NOT NULL
+  AND salary > 0
+  AND salary <= 500000
+""").toPandas()
+
+fig_salary_dist = px.histogram(
+    salary_distribution,
+    x="salary",
+    nbins=50,
+    title="Salary Distribution in the Dataset",
+    labels={
+        "salary": "Salary ($)",
+        "count": "Number of Job Postings"
+    }
+)
+
+fig_salary_dist.update_layout(
+    template="plotly_white",
+    height=450,
+    margin=dict(l=60, r=40, t=70, b=60),
+    title=dict(x=0.02, xanchor="left"),
+    xaxis=dict(tickprefix="$", separatethousands=True),
+    yaxis=dict(gridcolor="rgba(0,0,0,0.08)")
+)
+
+fig_salary_dist.show()
+```
+
+**Key insight:** Most salary values are concentrated around the middle salary range, with a smaller number of high-end salaries extending into the upper tail. This indicates that compensation is not evenly distributed and that high-salary outliers may influence salary comparisons and later predictive modeling results.
+
+## 6. Salary Distribution by Job Characteristics
+
+Why this visualization was chosen:  
+This section explores whether salary differs across important job characteristics such as  education level, and occupation. These comparisons help identify which variables appear meaningful for later salary analysis.
+
+```{python}
+#| echo: fenced
+#| code-fold: true
+#| code-summary: "Show code"
+#| warning: false
+#| message: false
+
+education_salary = spark.sql("""
+SELECT
+    CASE
+        WHEN LOWER(COALESCE(e.education_level, 'Unknown')) LIKE '%ph.d%' THEN 'PhD / Professional'
+        WHEN LOWER(COALESCE(e.education_level, 'Unknown')) LIKE '%professional degree%' THEN 'PhD / Professional'
+        WHEN LOWER(COALESCE(e.education_level, 'Unknown')) LIKE '%master%' THEN 'Master'
+        WHEN LOWER(COALESCE(e.education_level, 'Unknown')) LIKE '%bachelor%' THEN 'Bachelor'
+        WHEN LOWER(COALESCE(e.education_level, 'Unknown')) LIKE '%associate%' THEN 'Associate'
+        WHEN LOWER(COALESCE(e.education_level, 'Unknown')) LIKE '%high school%' THEN 'High School / GED'
+        ELSE 'Unknown'
+    END AS education_level_clean,
+    j.salary
+FROM job_postings j
+LEFT JOIN education_levels e
+    ON j.id = e.id
+WHERE j.salary IS NOT NULL
+  AND j.salary > 0
+  AND j.salary <= 500000
+""").toPandas()
+
+education_order = [
+    "High School / GED",
+    "Associate",
+    "Bachelor",
+    "Master",
+    "PhD / Professional",
+    "Unknown"
+]
+
+fig_education_salary = px.box(
+    education_salary,
+    x="education_level_clean",
+    y="salary",
+    color="education_level_clean",
+    category_orders={"education_level_clean": education_order},
+    title="Salary Distribution by Education Level",
+    labels={
+        "education_level_clean": "Education Level",
+        "salary": "Salary ($)"
+    },
+    color_discrete_sequence=px.colors.qualitative.Set3
+)
+
+fig_education_salary.update_layout(
+    template="plotly_white",
+    height=480,
+    margin=dict(l=60, r=40, t=70, b=90),
+    title=dict(x=0.02, xanchor="left"),
+    showlegend=False,
+    xaxis_tickangle=-25,
+    yaxis=dict(tickprefix="$", separatethousands=True)
+)
+
+fig_education_salary.show()
+```
+
+```{python}
+#| echo: fenced
+#| code-fold: true
+#| code-summary: "Show code"
+#| warning: false
+#| message: false
+
+occupation_salary = spark.sql("""
+WITH top_occ AS (
+    SELECT
+        o.specialized_occupation_name,
+        COUNT(*) AS job_count
+    FROM job_postings j
+    LEFT JOIN occupations o
+        ON j.occupation_id = o.occupation_id
+    WHERE j.salary IS NOT NULL
+      AND j.salary > 0
+      AND j.salary <= 500000
+      AND o.specialized_occupation_name IS NOT NULL
+    GROUP BY o.specialized_occupation_name
+    ORDER BY job_count DESC
+    LIMIT 8
+)
+SELECT
+    o.specialized_occupation_name,
+    j.salary
+FROM job_postings j
+LEFT JOIN occupations o
+    ON j.occupation_id = o.occupation_id
+INNER JOIN top_occ t
+    ON o.specialized_occupation_name = t.specialized_occupation_name
+WHERE j.salary IS NOT NULL
+  AND j.salary > 0
+  AND j.salary <= 500000
+""").toPandas()
+
+occupation_salary_plot = occupation_salary.copy()
+
+fig_occupation_salary = px.box(
+    occupation_salary_plot,
+    x="salary",
+    y="specialized_occupation_name",
+    color="specialized_occupation_name",
+    orientation="h",
+    title="Salary Distribution by Top Occupation Categories",
+    labels={
+        "specialized_occupation_name": "Occupation Category",
+        "salary": "Salary ($)"
+    },
+    color_discrete_sequence=px.colors.qualitative.Set3
+)
+
+fig_occupation_salary.update_layout(
+    template="plotly_white",
+    height=620,
+    margin=dict(l=270, r=60, t=70, b=60),
+    title=dict(x=0.02, xanchor="left"),
+    showlegend=False,
+    font=dict(size=12),
+    xaxis=dict(
+        tickprefix="$",
+        separatethousands=True,
+        gridcolor="rgba(0,0,0,0.08)"
+    ),
+    yaxis=dict(
+        title="",
+        automargin=True
+    )
+)
+
+fig_occupation_salary.show()
+```
+
+**Key insight:** Salary varies across both education levels and occupation categories. Higher education groups generally show higher salary ranges, while occupation categories such as Enterprise Architect, Oracle Consultant / Analyst, and General ERP Analyst / Consultant show different median salaries and wider salary spreads than some analyst-focused roles. This suggests that compensation is strongly connected to role type and qualification level.
+
+## 7. Remote Work Type Distribution
+
+Why this visualization was chosen:  
+Remote-work type is an important job characteristic, but it may contain unclear categories. This chart shows whether remote-work status is clearly captured in the dataset.
+
+```{python}
+#| echo: fenced
+#| code-fold: true
+#| code-summary: "Show code"
 #| warning: false
 #| message: false
 
@@ -438,12 +557,6 @@ display(style_table(remote_summary, {
     "job_count": "{:,.0f}",
     "job_share": "{:.1%}"
 }))
-```
-
-```{python}
-#| echo: true
-#| warning: false
-#| message: false
 
 fig_remote = px.bar(
     remote_summary,
@@ -451,15 +564,10 @@ fig_remote = px.bar(
     y="job_count",
     text="job_count",
     color="remote_type",
-    color_discrete_map={
-        "Unknown": "#636EFA",
-        "Remote": "#00CC96",
-        "Hybrid Remote": "#AB63FA",
-        "Not Remote": "#FFA15A"
-    },
+    color_discrete_sequence=px.colors.qualitative.Set2,
     title="Remote Type Distribution",
     labels={
-        "remote_type": "",
+        "remote_type": "Remote Work Type",
         "job_count": "Number of Job Postings"
     }
 )
@@ -472,8 +580,8 @@ fig_remote.update_traces(
 
 fig_remote.update_layout(
     template="plotly_white",
-    height=380,
-    margin=dict(l=50, r=40, t=70, b=50),
+    height=420,
+    margin=dict(l=60, r=40, t=70, b=60),
     title=dict(x=0.02, xanchor="left"),
     showlegend=False,
     font=dict(size=12),
@@ -483,12 +591,15 @@ fig_remote.update_layout(
 fig_remote.show()
 ```
 
-**Insight:** Remote-work status is not always clearly identified in the dataset, so the `Unknown` category is kept instead of being assumed to be on-site. Later remote-work salary comparisons should filter to clearly labeled categories such as Remote, Hybrid Remote, and Not Remote.
+**Key insight:** Remote-work status is not clearly identified for most postings, with [None] representing the largest category. This category should be treated as a data-quality issue rather than a true work arrangement. Clearly labeled categories such as Remote, Hybrid Remote, and Not Remote are more reliable for later salary comparisons.
 
-## 7. Top 10 States by Job Postings
+## 8. Top States by Job Postings
+
+Why this visualization was chosen:  
+Location can affect salary and labor-market demand. This chart shows where job postings are most concentrated geographically.
 
 ```{python}
-#| echo: true
+#| echo: false
 #| warning: false
 #| message: false
 
@@ -511,7 +622,7 @@ display(style_table(top_states, {
 ```
 
 ```{python}
-#| echo: true
+#| echo: false
 #| warning: false
 #| message: false
 
@@ -539,9 +650,7 @@ fig_states = px.bar(
     color_discrete_sequence=px.colors.qualitative.Set3
 )
 
-fig_states.update_traces(
-    marker_line_width=0
-)
+fig_states.update_traces(marker_line_width=0)
 
 fig_states.update_layout(
     template="plotly_white",
@@ -556,12 +665,15 @@ fig_states.update_layout(
 fig_states.show()
 ```
 
-**Insight:** The top states show where job-posting activity is most concentrated in the dataset. These states are important for later geographic salary comparisons because they provide larger sample sizes than smaller markets.
+**Key insight:** Job postings are concentrated in a small number of states, especially Texas and California. These high-volume states provide stronger sample sizes for geographic analysis, while smaller markets may produce less stable salary or demand comparisons.
 
-## 8. Top 10 Industries by Job Postings
+## 9. Top Industries by Job Postings
+
+Why this visualization was chosen:  
+Industry context helps identify which sectors contribute the most job postings. This matters because salary availability and job characteristics may differ by industry.
 
 ```{python}
-#| echo: true
+#| echo: false
 #| warning: false
 #| message: false
 
@@ -584,7 +696,7 @@ display(style_table(top_industries, {
 ```
 
 ```{python}
-#| echo: true
+#| echo: false
 #| warning: false
 #| message: false
 
@@ -611,7 +723,6 @@ top_industries_plot["industry_label"] = (
     + ")"
 )
 
-# ascending=True makes highest value appear at the top in horizontal Plotly charts
 top_industries_plot = top_industries_plot.sort_values("job_count", ascending=True)
 
 fig_industries = px.bar(
@@ -655,20 +766,23 @@ fig_industries.update_layout(
 fig_industries.show()
 ```
 
-**Insight:** The industry distribution shows which sectors contribute the largest number of job postings. If an unclassified industry category is large, final industry-specific comparisons should either treat it as a data-quality category or exclude it when comparing clearly defined industries.
+**Key insight:** Job postings are concentrated in unclassified industry, computer programming, management consulting, employment agencies, and computer systems design. The large unclassified industry category shows that industry-level analysis should be interpreted carefully because not all postings have a clearly defined sector.
 
-## 9. Career Categories and Sample Job Titles
+## 10. Occupation Categories
+
+Why this visualization was chosen:  
+Occupation is an important job characteristic because salary and required skills may differ across analyst, architect, ERP, Oracle, SAP, business analyst, and BI roles.
+
 ```{python}
-#| echo: true
+#| echo: false
 #| warning: false
 #| message: false
 
-career_title_preview = spark.sql("""
+occupation_summary = spark.sql("""
 SELECT
     o.specialized_occupation_name,
     COUNT(j.id) AS job_count,
-    COUNT(DISTINCT j.title_clean) AS unique_job_titles,
-    CONCAT_WS(', ', SLICE(COLLECT_SET(j.title_clean), 1, 10)) AS sample_titles
+    COUNT(DISTINCT j.title_clean) AS unique_job_titles
 FROM job_postings j
 LEFT JOIN occupations o
     ON j.occupation_id = o.occupation_id
@@ -679,32 +793,79 @@ GROUP BY
     o.specialized_occupation_name
 ORDER BY
     job_count DESC
+LIMIT 10
 """).toPandas()
 
-display(style_table(career_title_preview, {
+display(style_table(occupation_summary, {
     "job_count": "{:,.0f}",
     "unique_job_titles": "{:,.0f}"
 }))
 ```
 
-## 10. Top Skills in the Dataset
 ```{python}
-#| echo: true
+#| echo: false
+#| warning: false
+#| message: false
+
+occupation_plot = occupation_summary.copy()
+occupation_plot["occupation_label"] = (
+    occupation_plot["specialized_occupation_name"]
+    + " ("
+    + occupation_plot["job_count"].map(lambda x: f"{x:,.0f}")
+    + ")"
+)
+
+occupation_plot = occupation_plot.sort_values("job_count", ascending=True)
+
+fig_occupation = px.bar(
+    occupation_plot,
+    x="job_count",
+    y="occupation_label",
+    orientation="h",
+    color="specialized_occupation_name",
+    title="Top Occupation Categories by Job Postings",
+    labels={
+        "occupation_label": "",
+        "job_count": "Number of Job Postings"
+    },
+    color_discrete_sequence=px.colors.qualitative.Set3
+)
+
+fig_occupation.update_layout(
+    template="plotly_white",
+    height=520,
+    margin=dict(l=260, r=80, t=70, b=50),
+    title=dict(x=0.02, xanchor="left"),
+    showlegend=False,
+    font=dict(size=12),
+    xaxis=dict(gridcolor="rgba(0,0,0,0.08)")
+)
+
+fig_occupation.show()
+```
+
+**Key insight:** The dataset is heavily concentrated in Data Analyst roles, followed by ERP Analyst / Consultant, Enterprise Architect, Oracle Consultant / Analyst, and SAP Analyst / Admin roles. This shows that the dataset is not evenly balanced across occupations and that later salary analysis may be influenced by the dominance of data analyst postings.
+
+## 11. Top Skills in Job Postings
+
+Why this visualization was chosen:  
+Skills describe what employers request in each posting. A top-skills visualization helps identify which technical, analytical, software, and business skills appear most often.
+
+```{python}
+#| echo: false
 #| warning: false
 #| message: false
 
 top_skills = spark.sql("""
 SELECT
     skill_name,
-    skill_type,
     COUNT(DISTINCT job_id) AS job_count
 FROM job_skill_matches
 GROUP BY
-    skill_name,
-    skill_type
+    skill_name
 ORDER BY
     job_count DESC
-LIMIT 100
+LIMIT 20
 """).toPandas()
 
 display(style_table(top_skills, {
@@ -712,9 +873,112 @@ display(style_table(top_skills, {
 }))
 ```
 
-## 11. Possible AI-Related Skills
 ```{python}
-#| echo: true
+#| code-fold: true
+#| code-summary: Show code
+#| warning: false
+#| message: false
+
+top_skills_plot = top_skills.copy()
+
+# Sort descending by job count
+top_skills_plot = top_skills_plot.sort_values("job_count", ascending=False)
+
+# Plotly horizontal bars display category order bottom-to-top,
+# so reverse the order to show largest skill at the top.
+skill_order = top_skills_plot["skill_name"].tolist()[::-1]
+
+fig_skills = px.bar(
+    top_skills_plot,
+    x="job_count",
+    y="skill_name",
+    orientation="h",
+    color="skill_name",
+    text="job_count",
+    title="Top 20 Skills in Job Postings",
+    labels={
+        "skill_name": "Skill",
+        "job_count": "Number of Job Postings"
+    },
+    color_discrete_sequence=px.colors.qualitative.Set3
+)
+
+fig_skills.update_traces(
+    texttemplate="%{text:,.0f}",
+    textposition="outside",
+    marker_line_width=0
+)
+
+fig_skills.update_yaxes(
+    categoryorder="array",
+    categoryarray=skill_order
+)
+
+fig_skills.update_layout(
+    template="plotly_white",
+    height=700,
+    margin=dict(l=280, r=100, t=70, b=50),
+    title=dict(x=0.02, xanchor="left"),
+    showlegend=False,
+    font=dict(size=12),
+    xaxis=dict(gridcolor="rgba(0,0,0,0.08)")
+)
+
+fig_skills.show()
+```
+
+**Key insight:** The most common skills combine business, analytical, and technical requirements. Communication, Data Analysis, Management, SQL, Python, Microsoft Excel, Dashboard, SAP Applications, Power BI, and Business Intelligence appear frequently, suggesting that employers value a mix of communication, analytics, programming, visualization, and enterprise software skills.
+
+## 12. EDA Summary and Implications for Later Analysis
+
+The exploratory analysis shows that the dataset provides broad job-market coverage, but salary analysis is limited to the postings with usable salary information. Salary availability improves after imputation, although missingness still varies across AI-related status, remote-work type, and state. Salary values are concentrated in a middle range with a smaller high-salary tail, and compensation differs across education levels and occupation categories. The EDA also shows important data-quality issues, including a large [None] remote-work category and a large unclassified industry category. Overall, these findings suggest that later salary analysis should carefully account for occupation, education, location, skills, and data-quality limitations.
+
+# Appendix
+
+## Appendix A: Prepared Table Validation
+
+This appendix checks that the prepared tables were created successfully during the data preparation step. It is included as a validation reference rather than part of the main EDA.
+
+```{python}
+#| echo: false
+#| warning: false
+#| message: false
+
+table_counts = spark.sql("""
+SELECT 'job_postings' AS table_name, COUNT(*) AS row_count FROM job_postings
+UNION ALL
+SELECT 'companies' AS table_name, COUNT(*) AS row_count FROM companies
+UNION ALL
+SELECT 'industries' AS table_name, COUNT(*) AS row_count FROM industries
+UNION ALL
+SELECT 'locations' AS table_name, COUNT(*) AS row_count FROM locations
+UNION ALL
+SELECT 'occupations' AS table_name, COUNT(*) AS row_count FROM occupations
+UNION ALL
+SELECT 'skills' AS table_name, COUNT(*) AS row_count FROM skills
+UNION ALL
+SELECT 'job_skill_matches' AS table_name, COUNT(*) AS row_count FROM job_skill_matches
+UNION ALL
+SELECT 'ai_job_ids' AS table_name, COUNT(*) AS row_count FROM ai_job_ids
+UNION ALL
+SELECT 'jobs_with_ai' AS table_name, COUNT(*) AS row_count FROM jobs_with_ai
+UNION ALL
+SELECT 'salary_regression_data' AS table_name, COUNT(*) AS row_count FROM salary_regression_data
+UNION ALL
+SELECT 'salary_classification_data' AS table_name, COUNT(*) AS row_count FROM salary_classification_data
+""").toPandas()
+
+display(style_table(table_counts, {
+    "row_count": "{:,.0f}"
+}))
+```
+
+## Appendix B: Possible AI-Related Skills
+
+This appendix lists skills that may be related to AI, machine learning, predictive analytics, business intelligence, or modeling. It is included as supporting reference material, while the main EDA focuses on salary availability and job characteristics.
+
+```{python}
+#| echo: false
 #| warning: false
 #| message: false
 
@@ -753,7 +1017,3 @@ display(style_table(possible_ai_skills, {
     "job_count": "{:,.0f}"
 }))
 ```
-
-## EDA Summary Findings
-
-The exploratory analysis shows that the prepared dataset contains 72,476 job postings and that the salary-ready modeling sample contains 39,244 postings. The prepared relational tables include companies, industries, locations, occupations, skills, job-skill matches, AI job classifications, and salary modeling datasets. Salary availability improves after using the industry-median imputed salary variable, but missingness still varies across AI classification, remote-work type, state, and industry. The remote-work distribution contains a large unknown category, so later salary comparisons should focus on clearly labeled remote, hybrid, and not-remote postings. The top states, industries, occupations, and skills provide context for later salary, AI, and predictive modeling analyses.
