@@ -1411,7 +1411,7 @@ function updatePrediction() {{
     "Occupation Group: " + occupationGroup,
     "Specialized Occupation: " + specializedOccupation,
     "Remote: " + remote,
-    "Education: " + education
+    "Education: " + education,
     "Employment: " + employment,
     "Is AI Related: " + isAI
   ];
