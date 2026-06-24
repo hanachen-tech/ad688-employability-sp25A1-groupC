@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Nutchanon Chaiyaratana">
-<meta name="dcterms.date" content="2026-06-23">
+<meta name="dcterms.date" content="2026-06-24">
 
 <title>Job Market Analysis 2024 - Data Preparation</title>
 <style>
@@ -4693,7 +4693,108 @@ vertical-align: -.125em;
 }</script>
 
 
-<link href="data:text/css,%0A%0Ah1%2C%20h2%2C%20%2Eslide%2Dtitle%20%7B%0Acolor%3A%20%23002147%20%21important%3B%0Afont%2Dfamily%3A%20%27Poppins%27%2C%20sans%2Dserif%3B%0A%7D%0Ah3%2C%20h4%20%7B%0Acolor%3A%20%2300A6A6%20%21important%3B%20%7D%0A%2Enavbar%20%7B%0Abackground%2Dcolor%3A%20%23002147%20%21important%3B%0A%7D%0A%2Enavbar%20a%2C%20%2Enavbar%2Dbrand%2C%20%2Enav%2Dlink%20%7B%0Acolor%3A%20%23ffffff%20%21important%3B%0A%7D%0A%2Enav%2Dlink%3Ahover%20%7B%0Acolor%3A%20%2300A6A6%20%21important%3B%0A%7D%0A%2Ehero%2Dimage%20%7B%0Adisplay%3A%20block%3B%0Amargin%3A%2030px%20auto%3B%0Amax%2Dwidth%3A%2080%25%3B%0Aborder%2Dradius%3A%208px%3B%0Abox%2Dshadow%3A%200%204px%2015px%20rgb%28159%2C%20198%2C%20228%29%3B%0A%7D%0A%23toc%2Dtitle%2C%20%2Esidebar%20nav%5Brole%3D%22doc%2Dtoc%22%5D%20ul%20li%20a%2C%20%2Etoc%2Dactions%20a%20%7B%0Acolor%3A%20%23002147%20%21important%3B%0Aopacity%3A%200%2E8%3B%20%7D%0A%2Esidebar%20nav%5Brole%3D%22doc%2Dtoc%22%5D%20ul%20li%20a%3Ahover%2C%0A%2Esidebar%20nav%5Brole%3D%22doc%2Dtoc%22%5D%20ul%20li%20a%2Eactive%20%7B%0Acolor%3A%20%2300A6A6%20%21important%3B%20opacity%3A%201%20%21important%3B%0Aborder%2Dleft%2Dcolor%3A%20%2300A6A6%20%21important%3B%20%7D%0Aa%20%7B%0Acolor%3A%20%23002147%20%21important%3B%0Atext%2Ddecoration%3A%20none%20%21important%3B%0Atransition%3A%20all%200%2E2s%20ease%2Din%2Dout%20%21important%3B%0Aposition%3A%20relative%3B%0Adisplay%3A%20inline%2Dblock%3B%0A%7D%0Aa%3Ahover%20%7B%0Acolor%3A%20%2300A6A6%20%21important%3B%0Atext%2Ddecoration%3A%20underline%3B%0Atransform%3A%20translateY%28%2D2px%29%20scale%281%2E03%29%3B%20text%2Dshadow%3A%200%200%2010px%20rgba%280%2C%20166%2C%20166%2C%200%2E3%29%3B%0Acursor%3A%20url%28%22data%3Aimage%2Fsvg%2Bxml%3Butf8%2C%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww%2Ew3%2Eorg%2F2000%2Fsvg%27%20width%3D%2732%27%20height%3D%2732%27%20style%3D%27font%2Dsize%3A24px%27%3E%3Ctext%20y%3D%2724%27%3E%C3%B0%C2%9F%C2%A4%C2%96%3C%2Ftext%3E%3C%2Fsvg%3E%22%29%2C%20pointer%20%21important%3B%0A%7D%0Aa%3A%3Aafter%20%7B%0Acontent%3A%20%27%27%3B%0Aposition%3A%20absolute%3B%0Awidth%3A%20100%25%3B%0Atransform%3A%20scaleX%280%29%3B%0Aheight%3A%202px%3B%0Abottom%3A%20%2D2px%3B%0Aleft%3A%200%3B%0Abackground%2Dcolor%3A%20%2300A6A6%3B%0Atransform%2Dorigin%3A%20bottom%20right%3B%0Atransition%3A%20transform%200%2E25s%20ease%2Dout%3B%0A%7D%0Aa%3Ahover%3A%3Aafter%20%7B%0Atransform%3A%20scaleX%281%29%3B%0Atransform%2Dorigin%3A%20bottom%20left%3B%0A%7D%0A%2Econtent%2Darea%20a%2C%20%2Emarkdown%2Dsection%20a%20%7B%0Acolor%3A%20%23002147%20%21important%3B%0A%7D%0A" rel="stylesheet">
+<style type="text/css">
+
+h1, h2, .slide-title {
+color: #002147 !important;
+font-family: 'Poppins', sans-serif;
+}
+h3, h4 {
+color: #00A6A6 !important; }
+.navbar {
+background-color: #002147 !important;
+}
+.navbar a, .navbar-brand, .nav-link {
+color: #ffffff !important;
+}
+.navbar a, .nav-link, .btn a {
+display: inline-block !important;
+}
+.nav-link:hover {
+color: #00A6A6 !important;
+}
+.hero-image {
+display: block;
+margin: 30px auto;
+max-width: 80%;
+border-radius: 8px;
+box-shadow: 0 4px 15px rgb(159, 198, 228);
+}
+#toc-title, .sidebar nav[role="doc-toc"] ul li a, .toc-actions a {
+color: #002147 !important;
+opacity: 0.8; }
+.sidebar nav[role="doc-toc"] ul li a:hover,
+.sidebar nav[role="doc-toc"] ul li a.active {
+color: #00A6A6 !important; opacity: 1 !important;
+border-left-color: #00A6A6 !important; }
+a {
+color: #002147 !important;
+text-decoration: none !important;
+transition: all 0.2s ease-in-out !important;
+position: relative;
+display: inline !important;
+}
+a:hover {
+color: #00A6A6 !important;
+text-decoration: underline;
+text-shadow: 0 0 10px rgba(0, 166, 166, 0.3);
+cursor: pointer !important;
+}
+a::after {
+content: '';
+position: absolute;
+width: 100%;
+transform: scaleX(0);
+height: 2px;
+bottom: -2px;
+left: 0;
+background-color: #00A6A6;
+transform-origin: bottom right;
+transition: transform 0.25s ease-out;
+}
+a:hover::after {
+transform: scaleX(1);
+transform-origin: bottom left;
+}
+.content-area a, .markdown-section a {
+color: #002147 !important;
+}
+::selection {
+background-color: #00A6A6 !important; color: #ffffff !important; }
+::-moz-selection {
+background-color: #00A6A6 !important;
+color: #ffffff !important;
+}
+
+p, .markdown-section p {
+font-family: 'Lato', 'Helvetica Neue', Arial, sans-serif !important;
+font-size: 1.15rem !important;
+line-height: 1.85 !important; color: #2c3e50 !important; margin-bottom: 1.8rem !important;
+}
+
+.markdown-section > h2 + p::first-letter {
+font-family: 'Poppins', sans-serif;
+font-size: 3.5rem;
+font-weight: 700;
+float: left;
+color: #002147; line-height: 0.85;
+margin-right: 12px;
+margin-top: 4px;
+}
+
+img {
+border-radius: 8px !important; box-shadow: 0 10px 30px rgba(0, 33, 71, 0.08) !important; border: 1px solid rgba(0, 33, 71, 0.05) !important; transition: transform 0.3s ease !important;
+}
+img:hover {
+transform: scale(1.01);
+}
+.citation, a[href*="#ref-"] {
+background-color: rgba(0, 166, 166, 0.08) !important;
+padding: 2px 6px !important;
+border-radius: 4px !important;
+font-weight: 600 !important;
+}
+</style>
 </head>
 
 <body class="nav-fixed">
@@ -4803,7 +4904,7 @@ vertical-align: -.125em;
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">June 23, 2026</p>
+      <p class="date">June 24, 2026</p>
     </div>
   </div>
   
@@ -4827,7 +4928,7 @@ Output file: <code>data/cleaned/lightcast_cleaned.parquet</code></p>
 <section id="load-the-raw-data" class="level2">
 <h2 class="anchored" data-anchor-id="load-the-raw-data">1. Load the Raw Data</h2>
 <p>The raw Lightcast dataset contains job posting information such as job titles, companies, locations, industries, occupations, remote-work status, skills, and salary fields. I load the dataset using Spark because the file is large and the later analysis pages also rely on Spark SQL.</p>
-<div id="14766414" class="cell">
+<div id="af615083" class="cell">
 <details class="code-fold">
 <summary>Show code</summary>
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pyspark.sql <span class="im">import</span> SparkSession</span>
@@ -4898,7 +4999,7 @@ Output file: <code>data/cleaned/lightcast_cleaned.parquet</code></p>
 <section id="check-missing-values" class="level2">
 <h2 class="anchored" data-anchor-id="check-missing-values">2. Check Missing Values</h2>
 <p>Before cleaning, I checked missing values across all columns. This helps identify which variables have strong coverage and which fields require special handling before analysis.</p>
-<div id="9e261aa2" class="cell">
+<div id="c1bd00f8" class="cell">
 <details class="code-fold">
 <summary>Show code</summary>
 <div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a>total_rows <span class="op">=</span> df.count()</span>
@@ -4918,7 +5019,7 @@ Output file: <code>data/cleaned/lightcast_cleaned.parquet</code></p>
 <section id="check-duplicate-job-posting-ids" class="level2">
 <h2 class="anchored" data-anchor-id="check-duplicate-job-posting-ids">3. Check Duplicate Job Posting IDs</h2>
 <p>Each job posting should have a unique <code>ID</code>. Duplicate IDs can inflate job counts and bias downstream analysis, so I checked whether any IDs appeared more than once.</p>
-<div id="eae9f3f3" class="cell">
+<div id="c199ba48" class="cell">
 <details class="code-fold">
 <summary>Show code</summary>
 <div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>duplicate_ids <span class="op">=</span> df.groupBy(<span class="st">&quot;ID&quot;</span>).count().<span class="bu">filter</span>(col(<span class="st">&quot;count&quot;</span>) <span class="op">&gt;</span> <span class="dv">1</span>)</span>
@@ -4932,7 +5033,7 @@ Output file: <code>data/cleaned/lightcast_cleaned.parquet</code></p>
 <section id="remove-missing-and-duplicate-ids" class="level2">
 <h2 class="anchored" data-anchor-id="remove-missing-and-duplicate-ids">4. Remove Missing and Duplicate IDs</h2>
 <p>Rows with missing IDs were removed because they cannot be reliably treated as unique job postings. Duplicate IDs were also removed so that each job posting appears only once in the cleaned dataset.</p>
-<div id="4e00a404" class="cell">
+<div id="62ae06bb" class="cell">
 <details class="code-fold">
 <summary>Show code</summary>
 <div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>df_clean_base <span class="op">=</span> df.<span class="bu">filter</span>(col(<span class="st">&quot;ID&quot;</span>).isNotNull())</span>
@@ -4945,7 +5046,7 @@ Output file: <code>data/cleaned/lightcast_cleaned.parquet</code></p>
 <section id="check-suspicious-salary-and-date-values" class="level2">
 <h2 class="anchored" data-anchor-id="check-suspicious-salary-and-date-values">5. Check Suspicious Salary and Date Values</h2>
 <p>Before creating the final cleaned dataset, I reviewed salary and date fields for suspicious values. Salary values were checked for NaN values, non-positive values, unusually high values, invalid salary ranges, and unparseable posting dates.</p>
-<div id="aa32e119" class="cell" data-message="false">
+<div id="dc8ac466" class="cell" data-message="false">
 <details class="code-fold">
 <summary>Show code</summary>
 <div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>df_check <span class="op">=</span> df_clean_base.withColumn(<span class="st">&quot;SALARY&quot;</span>, col(<span class="st">&quot;SALARY&quot;</span>).cast(<span class="st">&quot;double&quot;</span>)) <span class="op">\</span></span>
@@ -4999,7 +5100,7 @@ Output file: <code>data/cleaned/lightcast_cleaned.parquet</code></p>
 <section id="clean-text-and-category-fields" class="level2">
 <h2 class="anchored" data-anchor-id="clean-text-and-category-fields">6. Clean Text and Category Fields</h2>
 <p>Important text fields were trimmed to remove extra whitespace. Education values were cleaned by removing newline and carriage-return characters. Missing or <code>[None]</code> remote-work values were labeled as <code>Unknown</code> instead of being assumed to be on-site.</p>
-<div id="c7605cd7" class="cell" data-message="false">
+<div id="bbf08302" class="cell" data-message="false">
 <details class="code-fold">
 <summary>Show code</summary>
 <div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>df_clean <span class="op">=</span> df_clean_base</span>
@@ -5056,7 +5157,7 @@ Output file: <code>data/cleaned/lightcast_cleaned.parquet</code></p>
 <section id="create-analysis-salary-variable" class="level2">
 <h2 class="anchored" data-anchor-id="create-analysis-salary-variable">7. Create Analysis Salary Variable</h2>
 <p>Salary is a key outcome variable in this project, so I created an <code>ANALYSIS_SALARY</code> field using all available employer-provided salary information. If <code>SALARY</code> was available, it was used directly. If <code>SALARY</code> was missing but both <code>SALARY_FROM</code> and <code>SALARY_TO</code> were available, their midpoint was used. If only one salary bound was available, that value was used. This reduces missing salary values without replacing missing salaries with an overall median.</p>
-<div id="01bcf461" class="cell" data-message="false">
+<div id="800a0f5a" class="cell" data-message="false">
 <details class="code-fold">
 <summary>Show code</summary>
 <div class="sourceCode cell-code" id="cb7"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>df_clean <span class="op">=</span> df_clean.withColumn(</span>
@@ -5101,7 +5202,7 @@ Output file: <code>data/cleaned/lightcast_cleaned.parquet</code></p>
 <section id="check-analysis-salary-availability" class="level2">
 <h2 class="anchored" data-anchor-id="check-analysis-salary-availability">8. Check Analysis Salary Availability</h2>
 <p>This section checks the original analysis salary coverage after using employer-provided salary fields. <code>ANALYSIS_SALARY</code> is created from <code>SALARY</code>, <code>SALARY_FROM</code>, and <code>SALARY_TO</code>. This is the main salary variable for primary salary analysis.</p>
-<div id="59cc7fd1" class="cell" data-message="false">
+<div id="76bc5125" class="cell" data-message="false">
 <details class="code-fold">
 <summary>Show code</summary>
 <div class="sourceCode cell-code" id="cb8"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>analysis_salary_check <span class="op">=</span> spark.sql(<span class="st">&quot;&quot;&quot;</span></span>
@@ -5209,7 +5310,7 @@ Output file: <code>data/cleaned/lightcast_cleaned.parquet</code></p>
 <section id="create-industry-median-imputed-salary-variable" class="level2">
 <h2 class="anchored" data-anchor-id="create-industry-median-imputed-salary-variable">9. Create Industry-Median Imputed Salary Variable</h2>
 <p>This step creates a separate salary variable for sensitivity analysis. Missing salaries are imputed using the median salary within the same industry only when that industry has at least 50% salary availability and at least 30 valid salary observations. The original <code>ANALYSIS_SALARY</code> column is not replaced.</p>
-<div id="03a411f3" class="cell" data-message="false">
+<div id="0d63bbdc" class="cell" data-message="false">
 <details class="code-fold">
 <summary>Show code</summary>
 <div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>industry_salary_quality <span class="op">=</span> df_clean.groupBy(<span class="st">&quot;NAICS_2022_6_NAME&quot;</span>).agg(</span>
@@ -5300,7 +5401,7 @@ Output file: <code>data/cleaned/lightcast_cleaned.parquet</code></p>
 <section id="check-final-salary-availability-after-imputation" class="level2">
 <h2 class="anchored" data-anchor-id="check-final-salary-availability-after-imputation">10. Check Final Salary Availability After Imputation</h2>
 <p>This section summarizes final salary availability after adding the industry-median imputed salary variable.</p>
-<div id="d3bcc6fa" class="cell" data-message="false">
+<div id="377d8982" class="cell" data-message="false">
 <details class="code-fold">
 <summary>Show code</summary>
 <div class="sourceCode cell-code" id="cb10"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>final_salary_availability_after_impute <span class="op">=</span> spark.sql(<span class="st">&quot;&quot;&quot;</span></span>
@@ -5335,7 +5436,7 @@ Output file: <code>data/cleaned/lightcast_cleaned.parquet</code></p>
 <section id="investigate-remaining-missing-salary-after-imputation" class="level2">
 <h2 class="anchored" data-anchor-id="investigate-remaining-missing-salary-after-imputation">11. Investigate Remaining Missing Salary After Imputation</h2>
 <p>After industry-median imputation, some postings still have missing salary values. These are postings where no valid salary was available and the industry did not have enough salary coverage to support reliable median imputation.</p>
-<div id="a7c15631" class="cell" data-message="false">
+<div id="93494c66" class="cell" data-message="false">
 <details class="code-fold">
 <summary>Show code</summary>
 <div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>missing_salary_reason_after_impute <span class="op">=</span> spark.sql(<span class="st">&quot;&quot;&quot;</span></span>
@@ -5425,7 +5526,7 @@ Output file: <code>data/cleaned/lightcast_cleaned.parquet</code></p>
 <section id="save-the-cleaned-dataset" class="level2">
 <h2 class="anchored" data-anchor-id="save-the-cleaned-dataset">12. Save the Cleaned Dataset</h2>
 <p>The cleaned dataset is saved as a Parquet file. Downstream pages should load this cleaned file instead of the raw CSV.</p>
-<div id="00dcde81" class="cell" data-message="false">
+<div id="33431acd" class="cell" data-message="false">
 <details class="code-fold">
 <summary>Show code</summary>
 <div class="sourceCode cell-code" id="cb12"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a>os.makedirs(<span class="st">&quot;data/cleaned&quot;</span>, exist_ok<span class="op">=</span><span class="va">True</span>)</span>
@@ -5440,7 +5541,7 @@ Output file: <code>data/cleaned/lightcast_cleaned.parquet</code></p>
 <h2 class="anchored" data-anchor-id="create-prepared-tables-for-analysis-and-modeling">13. Create Prepared Tables for Analysis and Modeling</h2>
 <p>This section creates reusable prepared tables from the cleaned dataset. These tables are saved as Parquet files so that downstream pages such as salary analysis, exploratory analysis, regression, and classification can load them directly without rebuilding joins and skill tables each time.</p>
 <p>#| echo: true #| warning: false #| message: false</p>
-<div id="d450f544" class="cell">
+<div id="0c6f7f9c" class="cell">
 <details class="code-fold">
 <summary>Show code</summary>
 <div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pyspark.sql.functions <span class="im">import</span> (</span>
