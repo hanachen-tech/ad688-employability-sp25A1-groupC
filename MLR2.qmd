@@ -39,7 +39,8 @@ Model 1 predicts salary using seven main feature groups: location, job title, sk
 
 from pyspark.sql import SparkSession
 
-from pyspark.sql.functions import col, when, trim, regexp_replace, count as spark_count, lower
+from pyspark.sql.functions import col, when, trim, regexp_replace, count as spark_count, lower, explode, split
+import re
 
 from pyspark.ml.feature import StringIndexer, OneHotEncoder, VectorAssembler
 
@@ -861,7 +862,7 @@ The ablation results guide the design of Model 2. Feature groups with larger R²
 
 ## Model 2: Improved Multiple Linear Regression
 
-Model 2 improves the baseline model by adding occupation group and specialized occupation, using cleaned education categories, keeping the top 30 grouped job titles to limit overfitting, and focusing on stronger predictors. Employment type and AI-related status are removed from Model 2 because they showed very small contribution in the ablation results.
+Model 2 improves the baseline model by adding occupation group and specialized occupation, using cleaned education categories, adding top raw skill indicators, and keeping job title, location, remote type, employment type, minimum experience, and AI-related status as predictors.
 
 ```{python}
 
@@ -932,7 +933,25 @@ df_model2_base = (
     .fillna({"education_level": "Unknown"})
 
 )
+# Add raw skills text from cleaned dataset for top raw skill indicators
+raw_skills_df_model2 = (
+    spark.read.parquet("data/cleaned/lightcast_cleaned.parquet")
+    .select(
+        col("ID").alias("id"),
+        col("SKILLS_NAME").alias("raw_skills_name")
+    )
+    .dropDuplicates(["id"])
+)
 
+df_model2_base = (
+    df_model2_base
+    .join(raw_skills_df_model2, on="id", how="left")
+    .withColumn(
+        "raw_skills_name",
+        regexp_replace(col("raw_skills_name"), r'[\n\r\"]', "")
+    )
+    .fillna({"raw_skills_name": ""})
+)
 # Clean education into simpler categories
 
 df_model2_base = df_model2_base.withColumn(
@@ -967,6 +986,39 @@ df_salary2 = df_model2_base.filter(
 
 ).cache()
 
+# Create top 20 raw skill indicators from SKILLS_NAME
+top_raw_skills_model2 = [
+    r["skill"] for r in
+    df_salary2
+    .select(explode(split(col("raw_skills_name"), ",")).alias("skill"))
+    .select(trim(col("skill")).alias("skill"))
+    .filter(col("skill") != "")
+    .groupBy("skill")
+    .agg(spark_count("*").alias("cnt"))
+    .orderBy(col("cnt").desc())
+    .limit(20)
+    .collect()
+]
+
+def clean_skill_col_name(skill):
+    clean_name = skill.lower()
+    clean_name = re.sub(r"[^a-z0-9]+", "_", clean_name)
+    clean_name = clean_name.strip("_")
+    return "raw_skill_" + clean_name
+
+raw_skill_cols_model2 = []
+
+for skill in top_raw_skills_model2:
+    col_name = clean_skill_col_name(skill)
+    raw_skill_cols_model2.append(col_name)
+
+    df_salary2 = df_salary2.withColumn(
+        col_name,
+        when(lower(col("raw_skills_name")).contains(skill.lower()), 1.0).otherwise(0.0)
+    )
+
+print("Model 2 top 20 raw skills:", top_raw_skills_model2)
+
 # Keep top 30 job titles to avoid too many sparse dummy variables
 
 top_titles_model2 = [
@@ -995,7 +1047,7 @@ df_model2 = df_salary2.withColumn(
 
 # Focused skill features
 
-skill_cols_model2 = [
+selected_skill_cols_model2 = [
 
     "has_python",
 
@@ -1018,10 +1070,34 @@ skill_cols_model2 = [
     "software_skill_count"
 
 ]
+skill_cols_model2 = selected_skill_cols_model2 + raw_skill_cols_model2
 
 # Select Model 2 features
+fill_values_model2 = {
+    "state_name": "Unknown",
+    "title_grouped": "Other",
+    "occupation_group_name": "Unknown",
+    "specialized_occupation_name": "Unknown",
+    "remote_type_name": "Unknown",
+    "employment_type_name": "Unknown",
+    "min_years_experience": 0,
+    "education_level_clean": "Unknown",
+    "is_ai_related": 0,
+    "has_python": 0,
+    "has_sql": 0,
+    "has_machine_learning": 0,
+    "has_tableau": 0,
+    "has_power_bi": 0,
+    "has_aws": 0,
+    "has_excel": 0,
+    "has_sap": 0,
+    "specialized_skill_count": 0,
+    "software_skill_count": 0
+}
 
-# Select Model 2 features
+for c in raw_skill_cols_model2:
+    fill_values_model2[c] = 0
+
 df_model2 = (
     df_model2
     .select(
@@ -1036,27 +1112,7 @@ df_model2 = (
          "education_level_clean",
          "is_ai_related"] + skill_cols_model2
     )
-    .fillna({
-        "state_name": "Unknown",
-        "title_grouped": "Other",
-        "occupation_group_name": "Unknown",
-        "specialized_occupation_name": "Unknown",
-        "remote_type_name": "Unknown",
-        "employment_type_name": "Unknown",
-        "min_years_experience": 0,
-        "education_level_clean": "Unknown",
-        "is_ai_related": 0,
-        "has_python": 0,
-        "has_sql": 0,
-        "has_machine_learning": 0,
-        "has_tableau": 0,
-        "has_power_bi": 0,
-        "has_aws": 0,
-        "has_excel": 0,
-        "has_sap": 0,
-        "specialized_skill_count": 0,
-        "software_skill_count": 0
-    })
+    .fillna(fill_values_model2)
     .cache()
 )
 
@@ -1331,7 +1387,7 @@ feature_names_model2 = (
     ["Education: " + x for x in education_labels_model2] +
     ["Minimum Years Experience"] +
     ["Is AI Related"] +
-    ["Skill: " + x.replace("has_", "").replace("_", " ").title() for x in skill_cols_model2]
+    ["Skill: " + x.replace("has_", "").replace("raw_skill_", "").replace("_", " ").title() for x in skill_cols_model2]
 )
 
 feature_names_model2 = feature_names_model2[:len(coefficients_model2)]
@@ -1531,6 +1587,11 @@ employment_options = sorted([
 # Create coefficient lookup from Model 2
 coef_lookup_model2 = dict(zip(feature_names_model2, coefficients_model2))
 
+widget_skill_cols_model2 = [
+    c for c in skill_cols_model2
+    if c not in ["specialized_skill_count", "software_skill_count"]
+]
+
 payload = {
     "intercept": float(lr_model2.intercept),
     "coef": {k: float(v) for k, v in coef_lookup_model2.items()},
@@ -1541,16 +1602,7 @@ payload = {
     "remotes": remote_options,
     "employments": employment_options,
     "educations": education_options,
-    "skills": [
-        "has_python",
-        "has_sql",
-        "has_machine_learning",
-        "has_tableau",
-        "has_power_bi",
-        "has_aws",
-        "has_excel",
-        "has_sap"
-    ]
+    "skills": widget_skill_cols_model2
 }
 
 payload_json = json.dumps(payload)
@@ -1569,6 +1621,12 @@ html = f"""
     <label>Employment Type<br><select id="sw-employment" style="width:100%; padding:6px;"></select></label>
     <label>Education Level<br><select id="sw-education" style="width:100%; padding:6px;"></select></label>
     <label>Minimum Years Experience<br><input id="sw-years" type="number" value="0" min="0" step="1" style="width:100%; padding:6px;"></label>
+    <label>AI Related Job<br>
+      <select id="sw-ai" style="width:100%; padding:6px;">
+        <option value="0">No</option>
+        <option value="1">Yes</option>
+      </select>
+    </label>
   </div>
 
   <h4>Skills Mentioned in Posting</h4>
@@ -1580,13 +1638,6 @@ html = f"""
     <div id="sw-factors" style="margin-top:12px; font-size:14px;"></div>
   </div>
 </div>
-
-<label>AI Related Job<br>
-  <select id="sw-ai" style="width:100%; padding:6px;">
-    <option value="0">No</option>
-    <option value="1">Yes</option>
-  </select>
-</label>
 
 <script>
 const salaryModel = {payload_json};
@@ -1616,7 +1667,7 @@ function prettySkill(s) {{
     "has_excel": "Excel",
     "has_sap": "SAP"
   }};
-  return names[s] || s.replace("has_", "").replaceAll("_", " ");
+  return names[s] || s.replace("has_", "").replace("raw_skill_", "").replaceAll("_", " ");
 }}
 
 function money(x) {{
@@ -1632,9 +1683,9 @@ function updatePrediction() {{
   const occupationGroup = document.getElementById("sw-occupation-group").value;
   const specializedOccupation = document.getElementById("sw-specialized-occupation").value;
   const remote = document.getElementById("sw-remote").value;
+  const employment = document.getElementById("sw-employment").value;
   const education = document.getElementById("sw-education").value;
   const years = parseFloat(document.getElementById("sw-years").value || "0");
-  const employment = document.getElementById("sw-employment").value;
   const isAI = parseFloat(document.getElementById("sw-ai").value || "0");
 
   const featureKeys = [
@@ -1643,9 +1694,8 @@ function updatePrediction() {{
     "Occupation Group: " + occupationGroup,
     "Specialized Occupation: " + specializedOccupation,
     "Remote: " + remote,
-    "Education: " + education,
     "Employment: " + employment,
-    "Is AI Related: " + isAI
+    "Education: " + education
   ];
 
   featureKeys.forEach(k => {{
@@ -1657,14 +1707,15 @@ function updatePrediction() {{
   const yearCoef = salaryModel.coef["Minimum Years Experience"] || 0;
   pred += yearCoef * years;
   if (Math.abs(yearCoef * years) > 1) factors.push(["Minimum Years Experience", yearCoef * years]);
+
   const aiCoef = salaryModel.coef["Is AI Related"] || 0;
-pred += aiCoef * isAI;
-if (Math.abs(aiCoef * isAI) > 1) factors.push(["Is AI Related", aiCoef * isAI]);
+  pred += aiCoef * isAI;
+  if (Math.abs(aiCoef * isAI) > 1) factors.push(["Is AI Related", aiCoef * isAI]);
 
   salaryModel.skills.forEach(s => {{
     const box = document.getElementById("sw-" + s);
     if (box && box.checked) {{
-      const key = "Skill: " + prettySkill(s);
+      const key = "Skill: " + prettySkill(s).replace(/\\b\\w/g, l => l.toUpperCase());
       const c = salaryModel.coef[key] || 0;
       pred += c;
       if (Math.abs(c) > 1) factors.push([key, c]);
@@ -1689,14 +1740,13 @@ addOptions("sw-title", salaryModel.titles);
 addOptions("sw-occupation-group", salaryModel.occupation_groups);
 addOptions("sw-specialized-occupation", salaryModel.specialized_occupations);
 addOptions("sw-remote", salaryModel.remotes);
-addOptions("sw-education", salaryModel.educations);
 addOptions("sw-employment", salaryModel.employments);
-
+addOptions("sw-education", salaryModel.educations);
 
 const skillsDiv = document.getElementById("sw-skills");
 salaryModel.skills.forEach(s => {{
   const label = document.createElement("label");
-  label.innerHTML = `<input type="checkbox" id="sw-${{s}}"> ${{prettySkill(s)}}`;
+  label.innerHTML = `<input type="checkbox" id="sw-${{s}}"> ${{prettySkill(s).replace(/\\b\\w/g, l => l.toUpperCase())}}`;
   skillsDiv.appendChild(label);
 }});
 
@@ -1922,7 +1972,7 @@ feature_names_model3 = (
     ["Education: " + x for x in education_labels_model3] +
     ["Minimum Years Experience"] +
     ["Is AI Related"] +
-    ["Skill: " + x.replace("has_", "").replace("_", " ").title() for x in skill_cols_model2]
+    ["Skill: " + x.replace("has_", "").replace("raw_skill_", "").replace("_", " ").title() for x in skill_cols_model2]
 )
 
 feature_names_model3 = feature_names_model3[:len(importances_model3)]
