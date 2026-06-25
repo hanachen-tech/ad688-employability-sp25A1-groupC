@@ -122,24 +122,24 @@ See `requirements.txt` for the complete dependency list.
 - pip or poetry for package management
 
 ### Installation
-# Clone the repository
+### Clone the repository
 git clone https://github.com/hanachen-tech/ad688-employability-sp25A1-groupC.git
 cd ad688-employability-sp25A1-groupC
 
-# Option 1: Using pip
+### Option 1: Using pip
 pip install -r requirements.txt
 
-# Option 2: Using poetry
+### Option 2: Using poetry
 poetry install
 
-# Install Quarto CLI (if not already installed)
-# See: https://quarto.org/docs/get-started/
+### Install Quarto CLI (if not already installed)
+### See: https://quarto.org/docs/get-started/
 
-# Render all Quarto documents
+### Render all Quarto documents
 quarto render
 
-# Render a specific document
+### Render a specific document
 quarto render index.qmd
 
-# Preview in browser
+### Preview in browser
 quarto preview
