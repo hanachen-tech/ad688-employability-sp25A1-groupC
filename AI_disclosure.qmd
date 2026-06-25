@@ -1,0 +1,52 @@
+---
+title: "AI Disclosure"
+subtitle: "AI Assistance Disclosure"
+author:
+  - name: Afreen Alam
+number-sections: true
+date: today
+format:
+  html:
+    theme: cerulean
+    toc: true
+    toc-depth: 2
+date-modified: today
+date-format: long
+execute:
+  echo: false
+  eval: false
+---
+
+## Prompt 1
+
+```text
+
+```
+## AI Prompt
+```text
+
+```
+
+```text
+
+```
+## AI Prompt
+```text
+
+```
+
+```text
+
+
+```
+## AI Prompt
+```text
+
+```
+```text
+
+```
+
+```text
+
+```
