@@ -114,13 +114,6 @@ See `requirements.txt` for the complete dependency list.
 
 ---
 
-## 🎯 Key Takeaways
-- AI Wage Premium is Real: AI-related roles consistently outperform traditional roles by ~14%
-- Geography Matters: Regional variations in AI compensation can reach 42%
-- Remote Work Pays: Explicitly remote positions show higher median salaries
-- Skills are Scarce: Python, SQL, and ML expertise command significant premiums
-- Title Levels Impact Pay: Senior titles significantly outperform entry-level positions
-
 ## 🚀 Getting Started
 
 ### Prerequisites
