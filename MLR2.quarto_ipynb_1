@@ -35,7 +35,7 @@
         "\n",
         "Model 1 predicts salary using seven main feature groups: location, job title, skills, remote work type, employment type, minimum years of experience, and education level."
       ],
-      "id": "d2374e11"
+      "id": "1bcef6a7"
     },
     {
       "cell_type": "code",
@@ -527,7 +527,7 @@
         "print(f\"\\nModel 1 RMSE is {rmse_pct_of_median_model1:.1f}% of median salary\")\n",
         "print(f\"Model 1 MAE is {mae_pct_of_median_model1:.1f}% of median salary\")"
       ],
-      "id": "7ac66374",
+      "id": "bf5ae0ea",
       "execution_count": null,
       "outputs": []
     },
@@ -541,7 +541,7 @@
         "\n",
         "Since this gap is fairly large, we proceed to refine the model in Model 2, adding features and structure to try to close it."
       ],
-      "id": "369f83e0"
+      "id": "b4d29904"
     },
     {
       "cell_type": "code",
@@ -600,7 +600,7 @@
         "\n",
         "].sort_values(\"Coefficient\", ascending=False)"
       ],
-      "id": "d679a2fc",
+      "id": "2586dd15",
       "execution_count": null,
       "outputs": []
     },
@@ -610,7 +610,7 @@
       "source": [
         "### Feature Coefficients"
       ],
-      "id": "39c1970a"
+      "id": "fb9d562e"
     },
     {
       "cell_type": "code",
@@ -639,7 +639,7 @@
         "\n",
         ")"
       ],
-      "id": "c2e1fc90",
+      "id": "b31bce06",
       "execution_count": null,
       "outputs": []
     },
@@ -649,7 +649,7 @@
       "source": [
         "## Which Features Impact Salary? (Model 1)"
       ],
-      "id": "43bb4a9c"
+      "id": "9e7fda88"
     },
     {
       "cell_type": "code",
@@ -761,7 +761,7 @@
         "\n",
         "fig_coef_model1.show()"
       ],
-      "id": "9910e3d9",
+      "id": "e56ffdd7",
       "execution_count": null,
       "outputs": []
     },
@@ -773,7 +773,7 @@
         "\n",
         "The ablation test removes one feature group at a time to see how much model performance decreases. A larger R² drop or larger RMSE/MAE increase means the removed feature group is more important."
       ],
-      "id": "bb59b08e"
+      "id": "bf2d9ddf"
     },
     {
       "cell_type": "code",
@@ -913,7 +913,7 @@
         "\n",
         "display(ablation_df_model1)"
       ],
-      "id": "7414e1f4",
+      "id": "71a7c377",
       "execution_count": null,
       "outputs": []
     },
@@ -927,7 +927,7 @@
         "\n",
         "Model 2 improves the baseline model by adding occupation group and specialized occupation, using cleaned education categories, adding top raw skill indicators, and keeping job title, location, remote type, employment type, minimum experience, and AI-related status as predictors."
       ],
-      "id": "acd77cf7"
+      "id": "79b1e790"
     },
     {
       "cell_type": "code",
@@ -1473,7 +1473,7 @@
         "\n",
         "].sort_values(\"Coefficient\", ascending=False)"
       ],
-      "id": "602f01a8",
+      "id": "b8abc361",
       "execution_count": null,
       "outputs": []
     },
@@ -1483,7 +1483,7 @@
       "source": [
         "### Feature Coefficients"
       ],
-      "id": "d26afdcb"
+      "id": "b21ee501"
     },
     {
       "cell_type": "code",
@@ -1512,7 +1512,7 @@
         "\n",
         ")"
       ],
-      "id": "da92226f",
+      "id": "524935e8",
       "execution_count": null,
       "outputs": []
     },
@@ -1522,7 +1522,7 @@
       "source": [
         "## Which Features Impact Salary? (Model 2)"
       ],
-      "id": "ddd4c3ab"
+      "id": "bb71f384"
     },
     {
       "cell_type": "code",
@@ -1634,7 +1634,7 @@
         "\n",
         "fig_coef_model2.show()"
       ],
-      "id": "feb5a3ff",
+      "id": "3ce3b159",
       "execution_count": null,
       "outputs": []
     },
@@ -1644,7 +1644,7 @@
       "source": [
         "### Try different job features and skills to see how each feature changes predicted salary."
       ],
-      "id": "1160d3eb"
+      "id": "885a5408"
     },
     {
       "cell_type": "code",
@@ -1864,7 +1864,7 @@
         "\n",
         "display(HTML(html))"
       ],
-      "id": "bedf19a3",
+      "id": "3424d60e",
       "execution_count": null,
       "outputs": []
     },
@@ -1876,7 +1876,7 @@
         "\n",
         "Model 3 reuses Model 2's training/test split (`train_model2` / `test_model2`) and copies Model 2's preprocessing exactly — the same `StringIndexer`/`OneHotEncoder` stages for job title, occupation group, specialized occupation, state, remote type, employment type, and education, plus the same numeric and skill columns. The only thing that changes is the final estimator: `LinearRegression` is replaced with `RandomForestRegressor`. This way, any difference in R², RMSE, or MAE reflects the choice of model (linear vs. tree ensemble), not a difference in input features."
       ],
-      "id": "8bf3fd96"
+      "id": "18dab860"
     },
     {
       "cell_type": "code",
@@ -2056,7 +2056,7 @@
         "print(f\"Model 3 RMSE is {rmse_pct_of_median_model3:.1f}% of median salary\")\n",
         "print(f\"Model 3 MAE is {mae_pct_of_median_model3:.1f}% of median salary\")"
       ],
-      "id": "5af36b72",
+      "id": "6c85c86f",
       "execution_count": null,
       "outputs": []
     },
@@ -2066,7 +2066,7 @@
       "source": [
         "### Feature Importance"
       ],
-      "id": "118778ce"
+      "id": "94090901"
     },
     {
       "cell_type": "code",
@@ -2116,7 +2116,7 @@
         "print(\"\\n=== Model 3: Top 20 Features by Importance (Random Forest) ===\")\n",
         "display(importance_df_model3.head(20))"
       ],
-      "id": "cf8ce523",
+      "id": "e6c1dd7e",
       "execution_count": null,
       "outputs": []
     },
@@ -2126,7 +2126,7 @@
       "source": [
         "## Which Features Matter Most for Prediction? (Model 3)"
       ],
-      "id": "518b06dc"
+      "id": "588b2d52"
     },
     {
       "cell_type": "code",
@@ -2206,7 +2206,7 @@
         "\n",
         "fig_importance_model3.show()"
       ],
-      "id": "4daa3f75",
+      "id": "c57cd7ac",
       "execution_count": null,
       "outputs": []
     },
@@ -2222,7 +2222,7 @@
         "\n",
         "## Final Model Comparison: MLR vs. Random Forest"
       ],
-      "id": "fae72317"
+      "id": "c2b3cf31"
     },
     {
       "cell_type": "code",
@@ -2259,7 +2259,7 @@
         "\n",
         "display(comparison_df_all)"
       ],
-      "id": "d23226e2",
+      "id": "87223bce",
       "execution_count": null,
       "outputs": []
     },
@@ -2276,7 +2276,7 @@
         "\n",
         "For anyone using this analysis to inform real decisions -- whether benchmarking a salary offer, setting pay bands, or flagging underpriced postings -- the practical takeaway is twofold. First, a non-linear model captures meaningfully more of the salary structure in this market than a linear one, so Model 3 should be the default choice when prediction accuracy matters most. Second, the linear models remain useful precisely because they are interpretable: Model 2's coefficients can tell a hiring manager \"this specific title is worth \\$X more,\" a statement Model 3 cannot make as directly. In practice, the two approaches complement each other -- Random Forest for the most accurate estimate, Multiple Linear Regression for explaining why that estimate looks the way it does."
       ],
-      "id": "945c63cf"
+      "id": "7e908d97"
     }
   ],
   "metadata": {
@@ -2284,7 +2284,7 @@
       "name": "python3",
       "language": "python",
       "display_name": "Python 3 (ipykernel)",
-      "path": "/home/ubuntu/ad688-employability-sp25A1-groupC/.venv/share/jupyter/kernels/python3"
+      "path": "/usr/share/jupyter/kernels/python3"
     }
   },
   "nbformat": 4,
