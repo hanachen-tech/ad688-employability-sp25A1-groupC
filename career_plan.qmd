@@ -1,12 +1,15 @@
 ---
 title: "Career Strategy"
 author: "Lo Ying Wu, Tsyr Rau Chen "
-date: 06/04/2026
-format: 
+date: 06/25/2026
+format:
   html:
+    theme: cosmo
     toc: true
+    toc-depth: 2
     code-fold: true
-    embed-resources: true 
+    code-summary: "Show code"
+    embed-resources: true
 execute:
   echo: true
   eval: true

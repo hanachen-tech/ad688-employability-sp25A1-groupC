@@ -1,5 +1,7 @@
 ---
 title: "ML Methods: Salary Prediction"
+author: "Nutchanon Chaiyaratana, Lo Ying Wu"
+date: 06/25/2026
 format:
   html:
     theme: cerulean
@@ -8,7 +10,7 @@ format:
     embed-resources: true
     code-fold: true
     code-summary: "Show code"
-date-modified: today
+date-modified: 06/25/2026
 date-format: long
 execute:
   echo: true

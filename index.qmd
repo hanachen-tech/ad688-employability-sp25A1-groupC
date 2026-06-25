@@ -2,8 +2,15 @@
 title: "Job Market Analysis 2024"
 subtitle: "A Data-Driven Look at Salaries, Regions, and Career Trends"
 author: "Afreen Alam, Lo Ying Wu, Nutchanon Chaiyaratana, Tsyr Rau Chen"
-date: "June 4, 2026"
-format: html
+date: "06/25/2026"
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-depth: 2
+    code-fold: true
+    code-summary: "Show code"
+    embed-resources: true
 ---
 
 Welcome to our Job Market Analysis project! Utilizing the comprehensive **Lightcast job postings dataset**, our team leveraged Python and PySpark to perform large-scale data cleaning, exploratory data analysis (EDA), salary trend evaluations, and predictive modeling. This project aims to uncover the latest dynamics of the 2024 job market and map out strategic career paths for our team.

@@ -1,12 +1,15 @@
 ---
 title: "Research Introduction: Salary & Compensation Trends"
 author: "Afreen Alam, Lo Ying Wu, Tsyr Rau Chen"
-date: 2026-05-31
-format: 
+date: 06/25/2026
+format:
   html:
-    bibliography: references.bib
-    csl: csl/econometrica.csl
+    theme: cosmo
     toc: true
+    toc-depth: 2
+    code-fold: true
+    code-summary: "Show code"
+    embed-resources: true
 ---
 
 ## Why is this topic important?

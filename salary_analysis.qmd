@@ -1,7 +1,7 @@
 ---
 title: "Salary & Compensation Trends"
-author: "Nutchanon Chaiyaratana and Afreen Alam"
-date: today
+author: "Nutchanon Chaiyaratana, Afreen Alam"
+date: 06/25/2026
 format:
   html:
     theme: cosmo
