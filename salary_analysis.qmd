@@ -1,7 +1,8 @@
+
 ---
 title: "Salary & Compensation Trends"
-author: "Nutchanon Chaiyaratana, Afreen Alam"
-date: 06/25/2026
+author: "Nutchanon Chaiyaratana and Afreen Alam"
+date: today
 format:
   html:
     theme: cosmo
@@ -266,10 +267,10 @@ fig_ai_premium = px.choropleth(
 fig_ai_premium.update_layout(
     template="plotly_white",
     height=550,
-    legend_title_text='Premium %'
+    legend=dict(title=dict(text='Premium %'))
 )
 
-#fig_ai_premium.show()
+fig_ai_premium.show()
 
 ```
 Insight: South Dakota and New Mexico have the highest salary premiums for AI-related roles, paying up to 42% more on average for AI roles than non-AI roles.
@@ -329,8 +330,8 @@ SELECT
     i.naics_2022_6_name AS industry,
     MONTH(j.posted_date) AS month_num,
     DATE_FORMAT(j.posted_date, 'MMM') AS month,
-    ROUND(
-        AVG(CAST(j.salary AS DOUBLE)),0) AS avg_salary
+    COUNT(*) AS posting_count,
+    ROUND(AVG(CAST(j.salary AS DOUBLE)), 0) AS avg_salary
 FROM job_postings j
 LEFT JOIN industries i
     ON j.industry_id = i.industry_id
@@ -339,20 +340,33 @@ WHERE
     AND j.salary IS NOT NULL
 GROUP BY
     i.naics_2022_6_name,
-    MONTH(j.posted_date), DATE_FORMAT(j.posted_date, 'MMM')
+    MONTH(j.posted_date),
+    DATE_FORMAT(j.posted_date, 'MMM')
 ORDER BY industry, MONTH(j.posted_date)
 """)
 
 industry_salary_monthly_pd = industry_salary_monthly.toPandas()
 
-top_industries = (
+industry_summary = (
     industry_salary_monthly_pd
-    .groupby("industry")["avg_salary"]
-    .mean()
-    .nlargest(12)
+    .groupby("industry")
+    .agg(
+        total_postings=("posting_count", "sum"),
+        mean_salary=("avg_salary", "mean")
+    )
+)
+posting_threshold = industry_summary["total_postings"].quantile(0.75)
+
+filtered_industries = industry_summary[
+    industry_summary["total_postings"] >= posting_threshold
+]
+
+top_industries = (
+    filtered_industries
+    .sort_values("mean_salary", ascending=False)
+    .head(12)
     .index
 )
-
 plot_df = industry_salary_monthly_pd[
     industry_salary_monthly_pd["industry"].isin(top_industries)
 ]
@@ -394,25 +408,34 @@ for i, industry in enumerate(top_industries):
 fig_industry.update_layout(
     title={
         "text": "Monthly Salary Trends by Industry (2024)",
-        "x": 0.0,        
+        "x": 0.0,
         "xanchor": "left",
         "y": 0.97
     },
     updatemenus=[
-        dict(
-            active=0,
-            direction="down",
-            x=0,          # align with left edge of plot
-            y=1.08,       # below title
-            xanchor="left",
-            yanchor="top",
-            buttons=buttons
-        )
-    ],
-    margin=dict(
-        t=100,   # increase top margin
-        r=120
+    dict(
+        active=0,
+        direction="down",
+        x=0.05,
+        y=1.22,       
+        xanchor="left",
+        yanchor="top",
+        buttons=buttons
+    )
+],
+    legend=dict(
+        orientation="h",
+        yanchor="top",
+        y=-0.35,
+        xanchor="center",
+        x=0.5,
+        title_text="Industry"
     ),
+   margin=dict(
+    t=100,  
+    r=40,
+    b=180
+),
     template="plotly_white",
     xaxis_title="Month",
     yaxis_title="Average Salary"
@@ -420,8 +443,8 @@ fig_industry.update_layout(
 
 fig_industry.show()
 ```
-Insight: Travel Agencies and Record Production & Distribution show the highest salary volatility in 2024, with sharp month-to-month swings in average pay, 
-suggesting these industries are primarily driven by irregular, seasonaly and non-base compensation structures [@blscesconcepts2025].
+Insight: Travel Agencies showed the highest salary volatility in 2024, with sharp month-to-month swings in average pay, 
+as it is primarily driven by irregular, seasonaly and non-base compensation structures [@blscesconcepts2025].
 Most other industries maintained relatively stable wage trends throughout 2024.
 
 ## Salary & Compensation Trends Dashboard
@@ -457,7 +480,8 @@ fig_ai_premium.update_layout(
         y=0.5,
         title=dict(font=dict(size=11)),
         tickfont=dict(size=10)
-    )
+    ),
+    legend=dict(title=dict(text='Premium %'))
 
 )
 fig_ai_premium.show()
@@ -468,8 +492,8 @@ fig_ai_premium.show()
 #| fig-cap: "Salary Distribution By Work-Arrangement"
 
 fig_remote.update_layout(
-    height=400,                            # Matches right plot height
-    margin=dict(l=20, r=20, t=40, b=20)   # Matches right plot padding exactly
+    height=400,                            
+    margin=dict(l=20, r=20, t=40, b=20)   
 )
 
 fig_remote.show()
@@ -485,8 +509,8 @@ SELECT
     i.naics_2022_6_name AS industry,
     MONTH(j.posted_date) AS month_num,
     DATE_FORMAT(j.posted_date, 'MMM') AS month,
-    ROUND(
-        AVG(CAST(j.salary AS DOUBLE)),0) AS avg_salary
+    COUNT(*) AS posting_count,
+    ROUND(AVG(CAST(j.salary AS DOUBLE)), 0) AS avg_salary
 FROM job_postings j
 LEFT JOIN industries i
     ON j.industry_id = i.industry_id
@@ -495,20 +519,33 @@ WHERE
     AND j.salary IS NOT NULL
 GROUP BY
     i.naics_2022_6_name,
-    MONTH(j.posted_date), DATE_FORMAT(j.posted_date, 'MMM')
+    MONTH(j.posted_date),
+    DATE_FORMAT(j.posted_date, 'MMM')
 ORDER BY industry, MONTH(j.posted_date)
 """)
 
 industry_salary_monthly_pd = industry_salary_monthly.toPandas()
 
-top_industries = (
+industry_summary = (
     industry_salary_monthly_pd
-    .groupby("industry")["avg_salary"]
-    .mean()
-    .nlargest(12)
+    .groupby("industry")
+    .agg(
+        total_postings=("posting_count", "sum"),
+        mean_salary=("avg_salary", "mean")
+    )
+)
+posting_threshold = industry_summary["total_postings"].quantile(0.75)
+
+filtered_industries = industry_summary[
+    industry_summary["total_postings"] >= posting_threshold
+]
+
+top_industries = (
+    filtered_industries
+    .sort_values("mean_salary", ascending=False)
+    .head(12)
     .index
 )
-
 plot_df = industry_salary_monthly_pd[
     industry_salary_monthly_pd["industry"].isin(top_industries)
 ]
@@ -528,21 +565,30 @@ fig_industry = px.line(
 )
 
 fig_industry.update_layout(
-    height=400,
-    margin=dict(l=20, r=20, t=40, b=20), 
+    title={
+        "text": "Monthly Salary Trends by Industry (2024)",
+        "x": 0.0,
+        "xanchor": "left",
+        "y": 0.97
+    },
     legend=dict(
-        orientation="h", 
-        yanchor="top", 
-        y=-0.35,              
-        xanchor="center", 
+        orientation="h",
+        yanchor="top",
+        y=-0.35,
+        xanchor="center",
         x=0.5,
-        font=dict(size=9)     
-    ), 
+        title_text="Industry"
+    ),
+   margin=dict(
+    t=100,   # more space above chart
+    r=40,
+    b=180
+),
     template="plotly_white",
     xaxis_title="Month",
     yaxis_title="Average Salary"
 )
-fig_industry.update_xaxes(categoryorder='array', categoryarray=month_order)
+
 fig_industry.show()
 ```
 :::
@@ -557,5 +603,5 @@ fig_industry.show()
 
 - Target AI Upskilling: Integrate machine learning, generative AI, and agentic capabilities into your current skill set. Even in traditional professions, adding a layer of AI competency unlocks a massive baseline salary premium without requiring a complete transition into foundational AI engineering.
 - Leverage Geographic Arbitrage: If you live outside of major tech hubs like San Francisco or New York, heavily target fully remote AI positions. Remote market dynamics force employers to align close to competitive national standards, allowing you to maximize a high-tier salary against a lower local cost of living
-- Navigate Variable Compensation Timelines: If you are targeting highly fluid industries like Travel or Media Production, prepare for total compensation packages dependent on irregular cycles. Anchor your job hunt, contract signings, or bonus structure negotiations around peak industry upswings to maximize immediate payouts.
+- Navigate Variable Compensation Timelines: If you are targeting highly fluid industries like Travel, prepare for total compensation packages dependent on irregular cycles. Anchor your job hunt, contract signings, or bonus structure negotiations around peak industry upswings to maximize immediate payouts.
 
