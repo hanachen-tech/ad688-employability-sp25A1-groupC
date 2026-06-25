@@ -21,6 +21,8 @@ execute:
 
 This page explores the cleaned Lightcast job postings dataset created during the data preparation step. The purpose of this exploratory analysis is to understand the dataset size, salary availability, missing salary patterns, remote-work categories, geographic concentration, industry concentration, occupation mix, and skill demand before moving into the main salary analysis.
 
+This EDA connects directly to the project’s research questions on salary and compensation trends. The research introduction focuses on uneven salary distribution, AI versus non-AI careers, location-based salary differences, remote-work patterns, industry differences, and skills connected to higher-value analytics roles. Therefore, this EDA does not try to answer the final salary questions yet; instead, it checks whether the cleaned Lightcast dataset contains the key variables and data quality needed for later salary comparison and predictive modeling.
+
 ## 1. Load Cleaned Data
 
 ```{python}
@@ -382,8 +384,108 @@ fig_salary_dist.update_layout(
 
 fig_salary_dist.show()
 ```
-
 **Key insight:** The salary distribution is concentrated mostly below $200,000, with the highest density around the middle salary range and a long right tail extending toward higher compensation levels. This indicates that most job postings fall within a typical salary band, but a smaller number of high-paying postings create substantial variation. Because of this skewed distribution, later salary analysis should evaluate both average prediction error and the effect of high-salary outliers rather than relying only on central tendency.
+
+
+## 5B. Median Salary by Employment Type
+
+Why this visualization was chosen:  
+The project overview expects higher pay to be concentrated among full-time employees and contractors in some cases. This chart compares median salary across employment types to check whether posted salaries differ by work arrangement. Median salary is used instead of average salary because the salary distribution has a high-salary tail.
+
+```{python}
+#| echo: false
+#| warning: false
+#| message: false
+
+from pyspark.sql.functions import col, percentile_approx, count
+
+employment_salary = spark.sql("""
+SELECT
+    COALESCE(employment_type_name, 'Unknown') AS employment_type,
+    COUNT(*) AS job_count,
+    percentile_approx(salary, 0.5) AS median_salary,
+    AVG(salary) AS avg_salary
+FROM job_postings
+WHERE salary IS NOT NULL
+  AND salary > 0
+  AND salary <= 500000
+GROUP BY COALESCE(employment_type_name, 'Unknown')
+HAVING COUNT(*) >= 50
+ORDER BY median_salary DESC
+""").toPandas()
+
+employment_salary["employment_type"] = employment_salary["employment_type"].replace({
+
+    "Part-time (â‰¤ 32 hours)": "Part-time (<= 32 hours)"
+
+})
+
+display(style_table(employment_salary, {
+    "job_count": "{:,.0f}",
+    "median_salary": "${:,.0f}",
+    "avg_salary": "${:,.0f}"
+}))
+```
+
+```{python}
+#| echo: false
+#| warning: false
+#| message: false
+
+employment_salary_plot = employment_salary.copy()
+employment_salary_plot["employment_label"] = (
+    employment_salary_plot["employment_type"]
+    + " (n="
+    + employment_salary_plot["job_count"].map(lambda x: f"{x:,.0f}")
+    + ")"
+)
+
+employment_salary_plot = employment_salary_plot.sort_values("median_salary", ascending=True)
+
+fig_employment_salary = px.bar(
+    employment_salary_plot,
+    x="median_salary",
+    y="employment_label",
+    orientation="h",
+    text="median_salary",
+    color="employment_type",
+    title="Median Salary by Employment Type",
+    labels={
+        "employment_label": "",
+        "median_salary": "Median Salary ($)"
+    },
+    color_discrete_sequence=px.colors.qualitative.Set3
+)
+
+fig_employment_salary.update_traces(
+    texttemplate="$%{text:,.0f}",
+    textposition="outside",
+    marker_line_width=0
+)
+
+fig_employment_salary.update_layout(
+    template="plotly_white",
+    height=420,
+    margin=dict(l=260, r=90, t=70, b=50),
+    title=dict(x=0.02, xanchor="left"),
+    showlegend=False,
+    font=dict(size=12),
+    xaxis=dict(
+        tickprefix="$",
+        separatethousands=True,
+        gridcolor="rgba(0,0,0,0.08)"
+    ),
+    yaxis=dict(
+        title="",
+        automargin=True
+    )
+)
+
+fig_employment_salary.show()
+```
+
+**Key insight:** Median salary differs across employment types, which supports the project overview’s expectation that compensation may vary by work arrangement. Full-time and contract-related postings should be compared carefully because each employment type may represent a different mix of roles, seniority levels, and industries. This chart provides an initial descriptive comparison, while the later modeling section controls for additional factors such as experience, occupation, education, location, and skills.
+
 
 ## 6. Salary Distribution by Job Characteristics
 
@@ -937,7 +1039,7 @@ The missing salary pattern is not fully random. Salary missingness varies by AI-
 
 Several job characteristics appear important for later analysis. Salary differs across education levels and occupation categories, while job postings are geographically concentrated in high-volume states such as Texas and California. The occupation and skill results show that the dataset contains multiple career paths, including Data Analyst, ERP, Enterprise Architect, Oracle, SAP, BI, and business analyst roles. Skills also combine technical tools, such as SQL, Python, Excel, Power BI, SAP, and Business Intelligence, with business-facing skills such as Communication, Management, Leadership, and Project Management.
 
-Overall, the EDA suggests that later salary analysis and predictive modeling should account for occupation, education, location, remote-work status, and skills, while also acknowledging data-quality limitations such as the large [None] remote-work category and the large Unclassified Industry category.
+Overall, this EDA serves as the bridge between the project overview and the modeling section: it shows that the dataset contains salary, AI-related status, location, remote-work type, industry, occupation, education, and skill variables needed to investigate the project’s main salary questions, while also identifying limitations that must be considered before interpreting the final results.
 
 # Appendix
 
