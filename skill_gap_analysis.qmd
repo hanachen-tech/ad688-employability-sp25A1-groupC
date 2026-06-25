@@ -115,11 +115,6 @@ fig_heatmap.show()
 ---
 
 
-**Reading the heatmap:** The dominance of yellow and red across most cells confirms that the team is largely at a beginner-to-intermediate level. No single member has a clear advanced skill in any category, and the bottom two rows (Nutchanon and Tsyr Rau) show a notably red profile — indicating the widest individual gaps relative to market expectations.
-
----
-
-
 ## Part 3: Market-Demanded Skills
 
 ### Top In-Demand Skills from Job Postings
@@ -209,17 +204,6 @@ fig_market.update_layout(
 
 fig_market.show()
 ```
-### Key Observations
-
-The market data tells a clear story: **Python and SQL are non-negotiable baselines** for data roles, appearing in 95% and 88% of postings respectively. Together, they form the minimum entry bar for most positions.
-
-**Machine Learning (75%)** ranks third — higher than many candidates might expect — reflecting the growing expectation that even non-specialist data analysts should be familiar with ML concepts and tools. **Cloud Computing (65%)** has surged in demand as enterprise workflows migrate to AWS, Azure, and GCP.
-
-Notably, **R (45%)**, though still valued in academic and research contexts, ranks last among the seven skills — suggesting that for industry roles, Python-first fluency is far more marketable.
-
----
-
-
 ### Key Observations
 
 The market data tells a clear story: **Python and SQL are non-negotiable baselines** for data roles, appearing in 95% and 88% of postings respectively. Together, they form the minimum entry bar for most positions.

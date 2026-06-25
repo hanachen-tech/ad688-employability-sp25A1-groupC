@@ -10,6 +10,8 @@ format:
     code-fold: true
     code-summary: "Show code"
     embed-resources: true
+    bibliography: references.bib
+    csl: csl/econometrica.csl
 execute:
   echo: true
   eval: true
@@ -163,6 +165,7 @@ fig_ai_salary = px.violin(
     salary_distribution_pd,
     x="career_type",
     y="salary",
+    box=True,
     color="career_type",
     points=False,
     title="Salary Distribution: AI vs Non-AI Careers"
@@ -178,7 +181,7 @@ fig_ai_salary.update_layout(
 fig_ai_salary.show()
 ```
 Insight: AI-related roles command higher salaries than non-AI roles, as seen from the elevated Q1, median and Q3 quartiles. 
-However, the maximum salary an AI-related role can bag is lower than a non-AI role.
+This is consistent our introductory research which told us that AI-specialized roles commanded higher salaries.
 
 ## What regions offer the highest-paying jobs in AI-related and traditional careers?
 ```{python}
@@ -262,14 +265,18 @@ fig_ai_premium = px.choropleth(
 
 fig_ai_premium.update_layout(
     template="plotly_white",
-    height=550
+    height=550,
+    legend_title_text='Premium %'
 )
 
 #fig_ai_premium.show()
 
 ```
 Insight: South Dakota and New Mexico have the highest salary premiums for AI-related roles, paying up to 42% more on average for AI roles than non-AI roles.
-On the other side, Kentucky penalizes AI-related roles, paying them ~4% lesser on average than non-AI roles.
+On the other side, Kentucky penalizes AI-related roles, paying them ~4% lesser on average than non-AI roles. States like CA, NY, WA 
+which are considered tech hubs show lower percentage premiums because their baseline tech salaries are already exceptionally high [@joshi2026enhancing]. On the contrary, in non-traditional 
+states like SD and NM, the baseline salary for local, non-AI corporate or IT roles is significantly lower and because AI talent is scarce in these areas,
+AI roles have to pay high rates to attract talent, enlarging the premium.
 
 
 ## Are remote jobs better paying than in-office roles?
@@ -289,8 +296,9 @@ remote_salary_pd = remote_salary.toPandas()
 remote_salary_pd["remote_type"] = remote_salary_pd["remote_type"].astype(str)
 remote_salary_pd = remote_salary_pd[
     (~remote_salary_pd["remote_type"].isna()) & 
-    (~remote_salary_pd["remote_type"].isin(["None", "Unknown", "nan", "null", ""]))
+    (~remote_salary_pd["remote_type"].isin(["None", "Unknown", "nan", "null", "", "[None]"]))
 ]
+
 fig_remote = px.box(
     remote_salary_pd,
     x="remote_type",
@@ -309,7 +317,9 @@ fig_remote.update_layout(
 #fig_remote.show()
 ```
 Insight: Remote jobs pay higher than non-remote and hybrid roles as seen from the highest Q1, median and Q3 values for remote roles. Non-remote and hybrid
-roles have very similar salary distributions, with hybrid role salaries showing more spread.
+roles have very similar salary distributions, with hybrid role salaries showing more spread. According to extensive labor market tracking by WFH Research 
+(Stanford / NBER) [@barrero2021wfh], fully remote work is highly selective toward specific high-earning tech and professional occupations, while hybrid setups have become 
+the widespread across a highly diverse cross-section of corporate roles.
 
 
 ## What industries saw the biggest wage growth in 2024?
@@ -410,9 +420,9 @@ fig_industry.update_layout(
 
 fig_industry.show()
 ```
-Insight: Agents for Wireless Telecommunications Services saw the most volatile salary swings, 
-dropping to a low of $100k in June before surging back to lead the pack near $340k by September. Meanwhile, most other industries maintained relatively 
-flat and stable wage trends throughout 2024.
+Insight: Travel Agencies and Record Production & Distribution show the highest salary volatility in 2024, with sharp month-to-month swings in average pay, 
+suggesting these industries are primarily driven by irregular, seasonaly and non-base compensation structures [@blscesconcepts2025].
+Most other industries maintained relatively stable wage trends throughout 2024.
 
 ## Salary & Compensation Trends Dashboard
 
@@ -470,6 +480,53 @@ fig_remote.show()
 #| label: fig-industry
 #| fig-cap: "Salary Growth By Industry"
 
+industry_salary_monthly = spark.sql("""
+SELECT
+    i.naics_2022_6_name AS industry,
+    MONTH(j.posted_date) AS month_num,
+    DATE_FORMAT(j.posted_date, 'MMM') AS month,
+    ROUND(
+        AVG(CAST(j.salary AS DOUBLE)),0) AS avg_salary
+FROM job_postings j
+LEFT JOIN industries i
+    ON j.industry_id = i.industry_id
+WHERE
+    YEAR(j.posted_date) = 2024
+    AND j.salary IS NOT NULL
+GROUP BY
+    i.naics_2022_6_name,
+    MONTH(j.posted_date), DATE_FORMAT(j.posted_date, 'MMM')
+ORDER BY industry, MONTH(j.posted_date)
+""")
+
+industry_salary_monthly_pd = industry_salary_monthly.toPandas()
+
+top_industries = (
+    industry_salary_monthly_pd
+    .groupby("industry")["avg_salary"]
+    .mean()
+    .nlargest(12)
+    .index
+)
+
+plot_df = industry_salary_monthly_pd[
+    industry_salary_monthly_pd["industry"].isin(top_industries)
+]
+month_order = [
+    "May", "Jun",
+    "Jul", "Aug", "Sep"
+]
+
+fig_industry = px.line(
+    plot_df,
+    x="month",
+    y="avg_salary",
+    color="industry",
+    markers=True,
+    category_orders={"month": month_order},
+    title="Monthly Salary Trends by Industry (2024)"
+)
+
 fig_industry.update_layout(
     height=400,
     margin=dict(l=20, r=20, t=40, b=20), 
@@ -480,21 +537,25 @@ fig_industry.update_layout(
         xanchor="center", 
         x=0.5,
         font=dict(size=9)     
-    )
+    ), 
+    template="plotly_white",
+    xaxis_title="Month",
+    yaxis_title="Average Salary"
 )
-fig_industry.update_xaxes(categoryorder='array', categoryarray=['May', 'Jun', 'Jul', 'Aug', 'Sep'])
+fig_industry.update_xaxes(categoryorder='array', categoryarray=month_order)
 fig_industry.show()
 ```
 :::
 
-# Key Insights
+## Key Insights
 
-- The AI Premium: AI-related roles offer a significantly higher median salary and clear premium across almost all U.S. states compared to non-AI positions.
-- Work Arrangement Flexibility: Fully remote and hybrid roles match or outpace traditional on-site ("Not Remote") distribution curves, signaling no financial penalty for flexible environments.
-- Industry Wage Volatility: Tech-adjacent sectors, particularly Agents for Wireless Telecommunications, exhibit massive monthly wage growth and volatility, while traditional industries like manufacturing remain flat.
+- The AI Premium: AI-related roles offer a clear, measurable premium across almost all U.S. states compared to non-AI positions. While the premium varies, the percentage increase peaks significantly in non-traditional tech states (like South Dakota and New Mexico) where employers must pay national market rates to attract scarce talent against lower local salary baselines.
+- Work Arrangement Flexibility: Fully remote roles command the highest Q1, median, and Q3 values, indicating that borderless national hiring pools for advanced tech talent drive remote compensation upward. Hybrid and on-site positions show highly similar median distributions, but hybrid roles exhibit a much broader spread due to its widespread adoption across vastly different corporate ranks and regional cost structures. 
+- Industry Wage Volatility: Project-based, commission-heavy, and contract-driven sectors like Travel Agencies and Record Production & Distribution exhibit massive month-over-month wage volatility rather than flat baseline salaries. In contrast, more standardized, asset-heavy fields like manufacturing maintain entirely flat, predictable monthly salary trends.
 
-# Recommendations for Job Seekers
+## Recommendations for Job Seekers
 
-- Target AI Upskilling: Integrate AI skills such as programming, machine learning, agentic AI capabilities into your current skill set to unlock higher baseline salaries.
-- Geographic Arbitrage: Utilize fully remote roles to secure high-paying positions anchored in tech-heavy regions without needing to relocate.
-- Timing over Tech-Adjacent Roles: If target industries involve high-volatility salary trends (like telecommunications), expect highly fluid compensation structures and time your negotiations during peak market upswings.
+- Target AI Upskilling: Integrate machine learning, generative AI, and agentic capabilities into your current skill set. Even in traditional professions, adding a layer of AI competency unlocks a massive baseline salary premium without requiring a complete transition into foundational AI engineering.
+- Leverage Geographic Arbitrage: If you live outside of major tech hubs like San Francisco or New York, heavily target fully remote AI positions. Remote market dynamics force employers to align close to competitive national standards, allowing you to maximize a high-tier salary against a lower local cost of living
+- Navigate Variable Compensation Timelines: If you are targeting highly fluid industries like Travel or Media Production, prepare for total compensation packages dependent on irregular cycles. Anchor your job hunt, contract signings, or bonus structure negotiations around peak industry upswings to maximize immediate payouts.
+

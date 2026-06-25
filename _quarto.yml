@@ -20,7 +20,7 @@ website:
        text: "Skill Gap Analysis"
      - href: salary_analysis.qmd
        text: "Salary Analysis"
-     - href: ml_methods.qmd
+     - href: MLR.qmd
        text: "Predictive Modeling"
      - href: career_plan.qmd
        text: "Career Strategy"
