@@ -18,6 +18,10 @@ h3, h4 {
     color: #ffffff !important;
 }
 
+.navbar a, .nav-link, .btn a {
+    display: inline-block !important;
+}
+
 .nav-link:hover {
     color: #00A6A6 !important;
 }
@@ -50,15 +54,14 @@ a {
     text-decoration: none !important;
     transition: all 0.2s ease-in-out !important;
     position: relative;
-    display: inline-block;
+    display: inline !important;
 }
 
 a:hover {
     color: #00A6A6 !important;
     text-decoration: underline;
-    transform: translateY(-2px) scale(1.03); 
     text-shadow: 0 0 10px rgba(0, 166, 166, 0.3);
-    cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='32' height='32' style='font-size:24px'><text y='24'>🤖</text></svg>"), pointer !important;
+    cursor: pointer !important;
 }
 
 a::after {
@@ -84,3 +87,54 @@ a:hover::after {
 }
 
 
+::selection {
+    background-color: #00A6A6 !important; 
+    color: #ffffff !important;           
+}
+
+::-moz-selection {
+    background-color: #00A6A6 !important;
+    color: #ffffff !important;
+}
+
+
+/* level up!!! */
+
+p, .markdown-section p {
+    font-family: 'Lato', 'Helvetica Neue', Arial, sans-serif !important;
+    font-size: 1.15rem !important;
+    line-height: 1.85 !important; 
+    color: #2c3e50 !important;   
+    margin-bottom: 1.8rem !important;
+}
+
+/* Drop Cap */
+.markdown-section > h2 + p::first-letter {
+    font-family: 'Poppins', sans-serif;
+    font-size: 3.5rem;
+    font-weight: 700;
+    float: left;
+    color: #002147; 
+    line-height: 0.85;
+    margin-right: 12px;
+    margin-top: 4px;
+}
+
+/* For Images */
+img {
+    border-radius: 8px !important; 
+    box-shadow: 0 10px 30px rgba(0, 33, 71, 0.08) !important; 
+    border: 1px solid rgba(0, 33, 71, 0.05) !important; 
+    transition: transform 0.3s ease !important;
+}
+
+img:hover {
+    transform: scale(1.01);
+}
+
+.citation, a[href*="#ref-"] {
+    background-color: rgba(0, 166, 166, 0.08) !important;
+    padding: 2px 6px !important;
+    border-radius: 4px !important;
+    font-weight: 600 !important;
+}
