@@ -383,7 +383,7 @@ fig_salary_dist.update_layout(
 fig_salary_dist.show()
 ```
 
-**Key insight:** Most salary values are concentrated around the middle salary range, with a smaller number of high-end salaries extending into the upper tail. This indicates that compensation is not evenly distributed and that high-salary outliers may influence salary comparisons and later predictive modeling results.
+**Key insight:** The salary distribution is concentrated mostly below $200,000, with the highest density around the middle salary range and a long right tail extending toward higher compensation levels. This indicates that most job postings fall within a typical salary band, but a smaller number of high-paying postings create substantial variation. Because of this skewed distribution, later salary analysis should evaluate both average prediction error and the effect of high-salary outliers rather than relying only on central tendency.
 
 ## 6. Salary Distribution by Job Characteristics
 
@@ -526,7 +526,7 @@ fig_occupation_salary.update_layout(
 fig_occupation_salary.show()
 ```
 
-**Key insight:** Salary varies across both education levels and occupation categories. Higher education groups generally show higher salary ranges, while occupation categories such as Enterprise Architect, Oracle Consultant / Analyst, and General ERP Analyst / Consultant show different median salaries and wider salary spreads than some analyst-focused roles. This suggests that compensation is strongly connected to role type and qualification level.
+**Key insight:** Salary varies meaningfully across education levels and specialized occupation categories. The boxplots show that Bachelor, Master, and PhD / Professional categories generally have higher salary ranges than High School / GED and Associate categories. Occupation categories also show different salary medians and spreads, with roles such as Enterprise Architect, Oracle Consultant / Analyst, and General ERP Analyst / Consultant showing different compensation patterns from Data Analyst and Financial Data Analyst roles. This supports using education and occupation as important explanatory features in later salary modeling.
 
 ## 7. Remote Work Type Distribution
 
@@ -665,7 +665,7 @@ fig_states.update_layout(
 fig_states.show()
 ```
 
-**Key insight:** Job postings are concentrated in a small number of states, especially Texas and California. These high-volume states provide stronger sample sizes for geographic analysis, while smaller markets may produce less stable salary or demand comparisons.
+**Key insight:** Texas leads the dataset with 7,792 job postings, followed by California with 6,885. This concentration may reflect Texas’s broader business and labor-market strength, including corporate relocations to major metros such as Austin, Dallas, and Houston, a diversified economy across technology, manufacturing, healthcare, logistics, and energy, and strong population growth that supports business expansion. Because Texas and California have much larger posting volumes than other states, they provide stronger sample sizes for geographic comparison, while smaller state markets should be interpreted more carefully.
 
 ## 9. Top Industries by Job Postings
 
@@ -766,7 +766,7 @@ fig_industries.update_layout(
 fig_industries.show()
 ```
 
-**Key insight:** Job postings are concentrated in unclassified industry, computer programming, management consulting, employment agencies, and computer systems design. The large unclassified industry category shows that industry-level analysis should be interpreted carefully because not all postings have a clearly defined sector.
+**Key insight:** Industry demand is concentrated in a few major sectors. The largest category is Unclassified Industry with 9,488 postings, which should be treated as a data-quality limitation. Among classified industries, Custom Computer Programming Services has the highest posting volume with 5,077 jobs, followed by Management Consulting, Employment Placement Agencies, and Computer Systems Design Services. Custom programming is likely important because modern organizations increasingly rely on customized applications, cloud systems, data platforms, and internal tools that must be tailored to specific business workflows. This helps explain why technology services, consulting, staffing, and systems design appear as major hiring sources in the dataset.
 
 ## 10. Occupation Categories
 
@@ -927,11 +927,17 @@ fig_skills.update_layout(
 fig_skills.show()
 ```
 
-**Key insight:** The most common skills combine business, analytical, and technical requirements. Communication, Data Analysis, Management, SQL, Python, Microsoft Excel, Dashboard, SAP Applications, Power BI, and Business Intelligence appear frequently, suggesting that employers value a mix of communication, analytics, programming, visualization, and enterprise software skills.
+**Key insight:** The top skills show that the job market values both technical execution and business-facing delivery. Communication, Management, Leadership, Project Management, Business Process, and Business Requirements rank highly, suggesting that many roles require translating technical work into business value, coordinating stakeholders, and delivering projects successfully. At the same time, SQL, Python, Excel, Dashboard, Power BI, SAP Applications, and Business Intelligence form a clear data workflow: SQL extracts data, Python supports cleaning and modeling, Excel remains a common business interface, and dashboard / BI tools turn data into usable insights. Overall, the skill mix suggests that employers are not only hiring for coding ability; they are hiring for people who can connect data, software tools, business processes, and decision-making.
 
 ## 12. EDA Summary and Implications for Later Analysis
 
-The exploratory analysis shows that the dataset provides broad job-market coverage, but salary analysis is limited to the postings with usable salary information. Salary availability improves after imputation, although missingness still varies across AI-related status, remote-work type, and state. Salary values are concentrated in a middle range with a smaller high-salary tail, and compensation differs across education levels and occupation categories. The EDA also shows important data-quality issues, including a large [None] remote-work category and a large unclassified industry category. Overall, these findings suggest that later salary analysis should carefully account for occupation, education, location, skills, and data-quality limitations.
+The exploratory analysis shows that the cleaned dataset provides broad job-market coverage, with 72,476 unique job postings across thousands of companies, locations, industries, occupations, and skills. However, salary-based analysis is limited to the subset of postings with usable salary information. After salary preparation and industry-median imputation, 39,244 postings, or 54.15% of the dataset, have usable salary values, while 33,232 postings remain missing salary.
+
+The missing salary pattern is not fully random. Salary missingness varies by AI-related status, remote-work type, and state, meaning later salary comparisons should be interpreted with this limitation in mind. The EDA also shows that salary values are concentrated in a middle range but include a smaller high-salary tail, so later modeling should consider both typical prediction error and the effect of high-salary outliers.
+
+Several job characteristics appear important for later analysis. Salary differs across education levels and occupation categories, while job postings are geographically concentrated in high-volume states such as Texas and California. The occupation and skill results show that the dataset contains multiple career paths, including Data Analyst, ERP, Enterprise Architect, Oracle, SAP, BI, and business analyst roles. Skills also combine technical tools, such as SQL, Python, Excel, Power BI, SAP, and Business Intelligence, with business-facing skills such as Communication, Management, Leadership, and Project Management.
+
+Overall, the EDA suggests that later salary analysis and predictive modeling should account for occupation, education, location, remote-work status, and skills, while also acknowledging data-quality limitations such as the large [None] remote-work category and the large Unclassified Industry category.
 
 # Appendix
 
@@ -1017,3 +1023,11 @@ display(style_table(possible_ai_skills, {
     "job_count": "{:,.0f}"
 }))
 ```
+
+## References
+
+Office of the Texas Governor. 2025. “Texas Leads Nation With Most New Jobs Added Over Last Year.” May 21, 2025. https://gov.texas.gov/news/post/texas-leads-nation-with-most-new-jobs-added-over-last-year
+
+Grand View Research. 2024. “U.S. Custom Software Development Market Size, Share & Trends Analysis Report, 2024–2030.” https://www.grandviewresearch.com/industry-analysis/us-custom-software-development-market-report
+
+Csorny, Lauren. 2013. “Careers in the Growing Field of Information Technology Services.” *Beyond the Numbers: Employment & Unemployment* 2 (9). U.S. Bureau of Labor Statistics. https://www.bls.gov/opub/btn/volume-2/careers-in-growing-field-of-information-technology-services.htmquarto render MLR2.qmd
