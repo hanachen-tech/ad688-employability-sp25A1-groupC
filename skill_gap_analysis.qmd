@@ -40,11 +40,23 @@ to data science and IT careers. We rated each skill on a scale of
 
 ### Creating Our Skill DataFrame
 
+job_skill_matches_df.createOrReplaceTempView("job_skill_matches")
+
 ```{python}
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
+from pyspark.sql import SparkSession
+spark = SparkSession.builder \
+    .config("spark.driver.host", "localhost") \
+    .appName("SalaryCompensationTrends") \
+    .getOrCreate()
+
+spark.catalog.clearCache()
+
+job_skill_matches = spark.read.parquet("data/prepared/job_skill_matches.parquet")
+job_skill_matches.show()
 
 # Create team skill data
 # Replace names and values with your actual team data
@@ -134,21 +146,21 @@ import plotly.express as px
 # Based on analysis of job postings, here are the top required skills
 # and their frequency in job postings
 
-job_skill_frequency = {
-    "Python": 95,
-    "SQL": 88,
-    "Machine Learning": 75,
-    "Cloud Computing": 65,
-    "Statistical Analysis": 60,
-    "Git/GitHub": 52,
-    "R": 45,
-}
+job_skill_frequency = spark.sql("""
+SELECT
+    skill_name,
+    COUNT(DISTINCT job_id) AS job_count
+FROM job_skill_matches
+GROUP BY
+    skill_name
+ORDER BY
+    job_count DESC
+""").toPandas()
 
-# Convert to DataFrame
-df_market = pd.DataFrame(
-    list(job_skill_frequency.items()),
-    columns=['Skill', 'Job Posting Frequency (%)']
-).sort_values('Job Posting Frequency (%)', ascending=False)
+skills_needed = ["Python","SQL","Machine Learning", "Data Visualization","Cloud Computing","Statistical Analysis",
+"Excel","Git","GitHub","R","Deep Learning"]
+
+job_skill_frequency_skills = job_skill_frequency[job_skill_frequency['skill_name'].isin(skills_needed)]
 
 print("Most In-Demand Skills in Job Market:")
 print(df_market)
@@ -158,38 +170,20 @@ print(df_market)
 
 ```{python}
 # Job skill frequency based on market analysis
-job_skill_frequency = {
-    "Python": 95,
-    "SQL": 88,
-    "Machine Learning": 75,
-    "Data Visualization": 68,
-    "Cloud Computing": 65,
-    "Statistical Analysis": 60,
-    "Excel": 58,
-    "Git/GitHub": 52,
-    "R": 45,
-    "Deep Learning": 35
-}
-
-# Convert to DataFrame
-df_market = pd.DataFrame(
-    list(job_skill_frequency.items()),
-    columns=['Skill', 'Job Posting Frequency (%)']
-).sort_values('Job Posting Frequency (%)', ascending=True)
 
 # Create interactive bar chart
 fig_market = go.Figure(data=[
     go.Bar(
-        y=df_market['Skill'],
-        x=df_market['Job Posting Frequency (%)'],
+        y=job_skill_frequency_skills['skill_name'],
+        x=job_skill_frequency_skills['job_count'],
         orientation='h',
         marker=dict(
-            color=df_market['Job Posting Frequency (%)'],
+            color=job_skill_frequency_skills['job_count'],
             colorscale='Blues',
             showscale=True,
             colorbar=dict(title="Frequency (%)")
         ),
-        text=df_market['Job Posting Frequency (%)'],
+        text=job_skill_frequency_skills['job_count'],
         textposition='auto',
         hovertemplate='<b>%{y}</b><br>Frequency: %{x}%<extra></extra>'
     )
@@ -235,7 +229,7 @@ team_avg_skills = df_skills_indexed.mean().sort_values(ascending=False)
 # Create comparison DataFrame
 comparison_df = pd.DataFrame({
     'Team Average': team_avg_skills,
-    'Market Demand': [job_skill_frequency.get(skill, 0) for skill in team_avg_skills.index]
+    'Market Demand': [job_skill_frequency_skills.get(skill, 0) for skill in team_avg_skills.index]
 })
 
 # Normalize market demand to 1-5 scale (0-100% → 1-5)
@@ -260,7 +254,7 @@ team_avg_skills = df_skills_indexed.mean().sort_values(ascending=False)
 # Create comparison DataFrame
 comparison_df = pd.DataFrame({
     'Team Average': team_avg_skills,
-    'Market Demand': [job_skill_frequency.get(skill, 0) for skill in team_avg_skills.index]
+    'Market Demand': [job_skill_frequency_skills.get(skill, 0) for skill in team_avg_skills.index]
 })
 
 # Normalize market demand to 1-5 scale

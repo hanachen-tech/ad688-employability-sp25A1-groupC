@@ -2,7 +2,7 @@
 title: "AI Disclosure"
 subtitle: "AI Assistance Disclosure"
 author:
-  - name: Afreen Alam, Nutchanon Chaiyaratana
+  - name: Afreen Alam, Nutchanon Chaiyaratana, Lo Ying Wu
 number-sections: true
 date: today
 format:
@@ -286,3 +286,74 @@ fig.update_layout(
 
 fig.show()
 ```
+
+
+## Prompt 9
+```text
+This is content my teammate created. He used "Use Multiple Linear Regression to model salary based on location, job title, skills, remote type, employment type, minimum experience, and education level" as Model 1, then added occupation as Model 2. I want to follow this same format and use Model 2's data to build a Random Forest model, then append my results after the existing content. I know what the output should look like and have a general idea of how to approach it, but I need help with the detailed implementation.
+```
+
+## AI Prompt
+```text
+
+I confirmed that for a fair comparison, Model 3 should reuse Model 2's already-fitted pipeline to transform the data into feature vectors, rather than rebuilding the StringIndexer/OneHotEncoder stages from scratch:
+
+```python
+train_features_model3 = model2.transform(train_model2).select("features", "salary")
+test_features_model3 = model2.transform(test_model2).select("features", "salary")
+```
+
+This guarantees Model 3 is evaluated on an identical feature representation to Model 2 (including occupation group and specialized occupation), so any difference in R², RMSE, or MAE reflects the choice of model itself rather than differences in feature engineering. I then replaced the LinearRegression estimator with RandomForestRegressor, kept the same evaluation metrics and Adjusted R² calculation for consistency with Models 1 and 2, and produced a feature importance table in place of the coefficient table — noting that importance scores and coefficients are not directly comparable, since importance has no direction while coefficients indicate both direction and dollar impact.
+
+Before handing off the code, I set up a synthetic PySpark environment to verify the logic ran correctly, including testing a high-cardinality categorical column similar to "specialized occupation" to confirm it wouldn't break the model.
+
+I also flagged several design decisions for the team to be aware of: reusing one-hot encoded features (rather than native categorical indices) prioritizes a fair comparison over Random Forest's best practice, Adjusted R² is reported only for table consistency since it is not a standard Random Forest evaluation metric, and the model used default hyperparameters (100 trees, max depth 10) without tuning — cross-validation could be added later if needed.
+```
+
+## Prompt 10
+```text
+My professor said MAE and RMSE need to include the max and min values, so we know whether the error is large or small. "Yeah we can compare against the max, min and median values from the violin plot in salary analysis to say this much deviation is ok" -- this is what my teammate said in the group chat. I want to incorporate this idea. Do you think I should add this explanation only in the final comparison table, or explain it as soon as MAE/RMSE first appear in Model 1?
+```
+
+## AI Prompt
+```text
+
+I recommended introducing the salary benchmark in Model 1, where MAE and RMSE first appear, rather than waiting until the Final Comparison table. My reasoning: the first time a reader sees a number like \$36,527, they need context to judge whether it's large or small — if the benchmark only appears at the end, both the Model 1 and Model 2 sections leave the reader without that context in the meantime.
+
+I also suggested establishing the benchmark once and reusing it across all three models rather than re-explaining it each time — once Model 1 states the median, min, and max salary and expresses RMSE as a percentage of the median, Model 2 and Model 3 can simply reference that same benchmark (e.g., "relative to the median established earlier, this model's error is N%") instead of repeating the full explanation.
+
+Concretely, I proposed computing the benchmark once as reusable values rather than just describing it in prose:
+
+- In the Model 1 section, add the median/min/max salary alongside the metrics table (computed directly from the dataset, consistent with the violin plot numbers from the team's salary analysis).
+- Add a column to each model's metrics table showing "RMSE/MAE as % of Median Salary," so the reader doesn't have to do the math themselves.
+- In the Final Comparison section, simply reference the benchmark already established, e.g., "relative to the median salary noted earlier, RMSE drops from X% to Y% to Z% across the three models."
+
+This directly reflects the logic the teammate raised in the group chat — comparing against the max, min, and median from the violin plot to judge whether a given deviation is acceptable — while only requiring the benchmark to be computed once rather than re-derived in every section.
+```
+
+## Prompt 11
+```text
+How do I check only this line:
+df_salary1.filter(col("salary") < 20000).select("salary", "title_grouped").show(10)
+```
+
+## AI Prompt
+```text
+
+I explained that this was the same situation as running `categorical_cols_model3` in isolation earlier, so the same approach applied. The key dependency: `df_salary1` is defined in the Model 1 code chunk (in the `df_model1_base.filter(...)` block), so this check can only run after `df_salary1` already exists in memory.
+
+I walked through the Quarto interactive approach in VS Code:
+
+1. Confirm the file type in the bottom-right status bar shows "Quarto" rather than "Plain Text."
+2. Find the code chunk in Model 1 that defines `df_salary1`, click into it, and use "Run Above" to build everything before it (Spark session, `df_model1_base`, `df_salary1`).
+3. Type the check line anywhere — for example, below the `salary_stats_model1` chunk:
+```python
+df_salary1.filter(col("salary") < 20000).select("salary", "title_grouped").show(10)
+```
+4. Select just that line and press Shift+Enter — VS Code sends only the selection to the kernel as a temporary cell and prints the result.
+
+I also offered an alternative for those who'd rather not add a separate line: temporarily append the check to the end of the existing `salary_stats_model1 = df_salary1.selectExpr(...)` chunk and use "Run Cell" instead of "Run Above," since that chunk already depends on `df_salary1`. After reviewing the output, the line should be removed so it doesn't remain in the final version of the file.
+
+As a fallback if the interactive run option still wasn't available, I suggested temporarily adding `raise SystemExit("...")` after the check line and running a full `quarto render` — this halts execution at that point instead of running through the entire document, the same workaround used previously.
+```
+
