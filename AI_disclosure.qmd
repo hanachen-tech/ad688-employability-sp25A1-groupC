@@ -2,7 +2,7 @@
 title: "AI Disclosure"
 subtitle: "AI Assistance Disclosure"
 author:
-  - name: Afreen Alam
+  - name: Afreen Alam, Nutchanon Chaiyaratana
 number-sections: true
 date: today
 format:
@@ -88,4 +88,201 @@ AI was used to help identify and fix PySpark and Quarto errors during rendering.
 Short example:
 job_skill_matches_df = spark.read.parquet("data/prepared/job_skill_matches.parquet")
 job_skill_matches_df.createOrReplaceTempView("job_skill_matches")
+```
+## Prompt 5
+
+```text
+i want to position legend at the bottom so the chart is wider
+```
+
+## AI Prompt
+
+```text
+Yes — move the legend from the right to the bottom using legend inside update_layout. This frees up horizontal space so the actual plotting area becomes much wider.
+
+Add this to your fig_industry.update_layout(...):
+
+legend=dict(
+    orientation="h",      # horizontal legend
+    yanchor="top",
+    y=-0.35,              # push below chart
+    xanchor="center",
+    x=0.5,                # center legend
+    title_text="Industry"
+)
+```
+
+## Prompt 6
+```text
+the dropdown filter is too close to the chart, i want it to be higher so it is not blocking the chart
+```
+
+## AI Prompt
+
+```text
+Yep — the dropdown is overlapping because its y position is still inside the plotting area.
+
+Right now you likely have:
+
+y=1.08
+
+In Plotly, the updatemenu coordinates are relative to the plot area, not the whole figure. So to move it higher, you need both:
+
+Increase y
+Increase top margin (margin.t)
+Fix
+
+Change this:
+
+updatemenus=[
+    dict(
+        active=0,
+        direction="down",
+        x=0,
+        y=1.08,
+        xanchor="left",
+        yanchor="top",
+        buttons=buttons
+    )
+]
+
+to:
+
+updatemenus=[
+    dict(
+        active=0,
+        direction="down",
+        x=0.05,
+        y=1.22,          # move higher
+        xanchor="left",
+        yanchor="top",
+        buttons=buttons
+    )
+]
+```
+
+## Prompt 7
+```text
+how can i improve the formating of my plotly dashboard in my quarto qmd file
+```
+
+## AI Prompt
+
+```text
+Oof, yes. We have a classic case of the "Plotly Subplot Crunch." When you combine totally different chart types (like box plots, a choropleth map with a massive colorbar, and multiple line graphs) into a single standard subplot grid, they fight for screen real estate, resulting in overlapping text and compressed charts.
+
+Since you are already using Quarto (.qmd), the absolute best way to fix this isn't by forcing everything into one monster make_subplots object. Instead, you should let Quarto's native dashboard layout grid handle the positioning.
+The Solution: Quarto Layout Panels
+You can use standard markdown headers to separate your narrative from your dashboard, and then use Quarto's layout-ncol or a layout div to cleanly arrange independent Plotly figures.
+
+By separating the figures, you eliminate the crushed spacing and messy overlapping legends seen in image_9bd24c.jpg. Utilize the below structure to create it.
+
+---
+# (Your existing YAML header remains unchanged)
+---
+
+(Your existing text, tables, and analysis go here...)
+
+---
+
+## Salary & Compensation Trends Dashboard
+
+Here is a visual breakdown of current market trends.
+
+::: {#dashboard-layout layout="[[50, 50], [50, 50]]"}
+
+```{python}
+#| echo: false
+#| label: fig1-name
+#| fig-cap: "title"
+
+# Base configuration to clean up the plot layout
+fig1.update_layout(margin=dict(l=20, r=20, t=40, b=20))
+fig1.show()
+
+#| echo: false
+#| label: fig2-name
+#| fig-cap: "title"
+
+# Fix the map scope so it's not a tiny world map
+fig2.update_geos(scope='usa')
+fig2.update_layout(margin=dict(l=20, r=20, t=40, b=20))
+fig2.show()
+
+```
+
+## Prompt 8
+```text
+how can i add a dropdown filter to a plotly plot?
+```
+
+## AI Prompt
+
+```text
+To add a dropdown filter directly into a standalone Plotly plot, you must pre-render all possible data groups as separate data traces, and then use the updatemenus property to toggle their visibility.Because client-side JavaScript plots cannot dynamically query a Python backend or filter raw pandas DataFrames on the fly, hiding and showing pre-loaded traces is the standard approach for native Plotly files.Core Implementation StrategyAdd a separate trace to the figure for each unique category in your data.Build a button list inside updatemenus, where each button uses the "restyle" method.Pass a boolean visibility list (e.g., [True, False, False]) via the visible parameter inside the button arguments to show only the selected group.Step-by-Step Code ExampleThe code snippet below groups a dataset by a specific category, builds individual data traces, and maps them to a native dropdown menu:pythonimport plotly.graph_objects as go
+import pandas as pd
+
+# 1. Mock Data Setup
+data = {
+    'X': [1, 2, 3, 1, 2, 3, 1, 2, 3],
+    'Y': [10, 11, 12, 20, 22, 24, 5, 6, 7],
+    'Category': ['Group A', 'Group A', 'Group A', 'Group B', 'Group B', 'Group B', 'Group C', 'Group C', 'Group C']
+}
+df = pd.DataFrame(data)
+
+fig = go.Figure()
+categories = df['Category'].unique()
+
+# 2. Add a separate trace for every category
+for cat in categories:
+    df_filtered = df[df['Category'] == cat]
+    fig.add_trace(
+        go.Scatter(
+            x=df_filtered['X'], 
+            y=df_filtered['Y'], 
+            mode='markers+lines', 
+            name=cat,
+            visible=True  # All groups visible by default
+        )
+    )
+
+# 3. Construct dropdown buttons dynamically
+dropdown_buttons = []
+
+# Add an "All Groups" option first
+dropdown_buttons.append({
+    "label": "All Groups",
+    "method": "restyle",
+    "args": [{"visible": [True] * len(categories)}]
+})
+
+# Add a button for each specific category
+for i, cat in enumerate(categories):
+    # Set the targeted group trace to True, and all others to False
+    visibility_mask = [False] * len(categories)
+    visibility_mask[i] = True
+    
+    dropdown_buttons.append({
+        "label": cat,
+        "method": "restyle",
+        "args": [{"visible": visibility_mask}]
+    })
+
+# 4. Inject the buttons into the layout updatemenus property
+fig.update_layout(
+    updatemenus=[{
+        "buttons": dropdown_buttons,
+        "direction": "down",
+        "showactive": True,
+        "x": 0.1,
+        "xanchor": "left",
+        "y": 1.15,
+        "yanchor": "top"
+    }],
+    title="Interactive Dropdown Filtering",
+    xaxis_title="X Axis",
+    yaxis_title="Y Axis"
+)
+
+fig.show()
 ```
