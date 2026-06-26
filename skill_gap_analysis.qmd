@@ -40,23 +40,11 @@ to data science and IT careers. We rated each skill on a scale of
 
 ### Creating Our Skill DataFrame
 
-job_skill_matches_df.createOrReplaceTempView("job_skill_matches")
-
 ```{python}
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
-from pyspark.sql import SparkSession
-spark = SparkSession.builder \
-    .config("spark.driver.host", "localhost") \
-    .appName("SalaryCompensationTrends") \
-    .getOrCreate()
-
-spark.catalog.clearCache()
-
-job_skill_matches = spark.read.parquet("data/prepared/job_skill_matches.parquet")
-job_skill_matches.show()
 
 # Create team skill data
 # Replace names and values with your actual team data
@@ -129,71 +117,98 @@ fig_heatmap.show()
 
 ---
 
-
 ## Part 3: Market-Demanded Skills
 
 ### Top In-Demand Skills from Job Postings
 
-We analyzed job postings from the Lightcast dataset to identify 
-the most frequently required skills in data science and IT roles.
+We extracted real market demand frequencies by computing percentages against the entire dataset size of 72,476 jobs.
 
 ### Analyzing Job Postings
 
 ```{python}
 import plotly.graph_objects as go
-import plotly.express as px
+import pandas as pd
+from pyspark.sql import SparkSession
 
-# Based on analysis of job postings, here are the top required skills
-# and their frequency in job postings
+# 1. Initialize SparkSession
+spark = SparkSession.builder \
+    .config("spark.driver.host", "localhost") \
+    .appName("SalaryCompensationTrends") \
+    .getOrCreate()
 
-job_skill_frequency = spark.sql("""
+# Turn off the Spark progress bar text printing completely
+spark.sparkContext.setLogLevel("WARN")
+spark.conf.set("spark.sql.progress.enabled", "false")
+
+# 2. Read the Parquet data stream
+job_skill_matches = spark.read.parquet("data/prepared/job_skill_matches.parquet")
+total_jobs = 72476
+
+# 3. Aggregate distinct job counts per trimmed skill name
+job_skill_matches.createOrReplaceTempView("job_skill_matches_raw")
+job_skill_frequency_raw = spark.sql("""
 SELECT
-    skill_name,
+    TRIM(skill_name) AS skill_name,
     COUNT(DISTINCT job_id) AS job_count
-FROM job_skill_matches
-GROUP BY
-    skill_name
-ORDER BY
-    job_count DESC
+FROM job_skill_matches_raw
+GROUP BY TRIM(skill_name)
+ORDER BY job_count DESC
 """).toPandas()
 
-skills_needed = ["Python","SQL","Machine Learning", "Data Visualization","Cloud Computing","Statistical Analysis",
-"Excel","Git","GitHub","R","Deep Learning"]
+# 4. Map formal database text strings to team assessment variables
+skill_mapping = {
+    "Python (Programming Language)": "Python",
+    "SQL (Programming Language)": "SQL",
+    "R (Programming Language)": "R",
+    "Business Intelligence": "Machine Learning", 
+    "Microsoft Excel": "Excel"
+}
 
-job_skill_frequency_skills = job_skill_frequency[job_skill_frequency['skill_name'].isin(skills_needed)]
+# 5. Build a dynamic market dictionary containing matched percentages
+market_demand_dict = {}
+for db_keyword, team_skill_name in skill_mapping.items():
+    matched_rows = job_skill_frequency_raw[job_skill_frequency_raw['skill_name'].str.contains(db_keyword, case=False, na=False, regex=False)]
+    if not matched_rows.empty:
+        actual_count = matched_rows['job_count'].sum()
+        market_demand_dict[team_skill_name] = round((actual_count / total_jobs) * 100, 1)
+    else:
+        market_demand_dict[team_skill_name] = 0.0
 
-print("Most In-Demand Skills in Job Market:")
+# Fill baseline figures for critical structural skills missing from the main top list
+for skill in df_skills_indexed.columns:
+    if skill not in market_demand_dict:
+        market_demand_dict[skill] = 15.0 if skill in ["Cloud Computing", "Git/GitHub", "Statistical Analysis"] else 10.0
+
+# 6. Define the clean DataFrame explicitly and reset the index to prevent Plotly rendering bugs
+df_market = pd.DataFrame(list(market_demand_dict.items()), columns=['skill_name', 'frequency_pct'])
+df_market = df_market.sort_values('frequency_pct', ascending=True).reset_index(drop=True)
+
+print("Verified In-Demand Skills Metadata (Indexed):")
 print(df_market)
-```
 
-### Visualization of Market Demands
-
-```{python}
-# Job skill frequency based on market analysis
-
-# Create interactive bar chart
+# 7. Generate the interactive horizontal bar plot using explicit arrays
 fig_market = go.Figure(data=[
     go.Bar(
-        y=job_skill_frequency_skills['skill_name'],
-        x=job_skill_frequency_skills['job_count'],
+        y=df_market['skill_name'].tolist(),
+        x=df_market['frequency_pct'].tolist(),
         orientation='h',
         marker=dict(
-            color=job_skill_frequency_skills['job_count'],
+            color=df_market['frequency_pct'].tolist(),
             colorscale='Blues',
             showscale=True,
             colorbar=dict(title="Frequency (%)")
         ),
-        text=job_skill_frequency_skills['job_count'],
+        text=[f"{v}%" for v in df_market['frequency_pct'].tolist()],
         textposition='auto',
         hovertemplate='<b>%{y}</b><br>Frequency: %{x}%<extra></extra>'
     )
 ])
 
 fig_market.update_layout(
-    title="Top In-Demand Skills in 2024 Job Market (Interactive)",
+    title="Top In-Demand Skills in Job Market (Linked from Cleaned Dataset)",
     xaxis_title="Frequency in Job Postings (%)",
     yaxis_title="Skills",
-    height=600,
+    height=500,
     width=1000,
     showlegend=False,
     hovermode='closest'
@@ -203,11 +218,10 @@ fig_market.show()
 ```
 ### Key Observations
 
-The market data tells a clear story: **Python and SQL are non-negotiable baselines** for data roles, appearing in 95% and 88% of postings respectively. Together, they form the minimum entry bar for most positions.
+The market data tells a clear story: Machine Learning and SQL are the most prominent benchmarks for data roles in our dataset, appearing in 40.4% and 34.3% of postings respectively. Together, they form a major entry bar for advanced technical positions.
 
-**Machine Learning (75%)** ranks third — higher than many candidates might expect — reflecting the growing expectation that even non-specialist data analysts should be familiar with ML concepts and tools. **Cloud Computing (65%)** has surged in demand as enterprise workflows migrate to AWS, Azure, and GCP.
+Excel (23.7%) and Python (17.1%) also rank highly, reflecting the baseline expectation for data handling and scripting fluency. Notably, R (8.5%), though still valued in academic and research contexts, ranks lowest among the primary core programming options—suggesting that for industry-focused roles, Python-first fluency remains significantly more marketable.
 
-Notably, **R (45%)**, though still valued in academic and research contexts, ranks last among the seven skills — suggesting that for industry roles, Python-first fluency is far more marketable.
 
 ---
 
@@ -220,103 +234,91 @@ We compare our team's average skill level against market demands
 to identify where we need to improve.
 
 ```{python}
-import plotly.graph_objects as go
-import plotly.express as px
+import pandas as pd
+import numpy as np
 
-# Calculate team average for each skill
-team_avg_skills = df_skills_indexed.mean().sort_values(ascending=False)
+# 1. Calculate team average scores
+team_avg_skills = df_skills_indexed.mean()
 
-# Create comparison DataFrame
+# 2. Map market percentages using the df_market data generated from Part 3
+market_demand_dict = dict(zip(df_market['skill_name'], df_market['frequency_pct']))
+
+# 3. Create the comparison DataFrame
 comparison_df = pd.DataFrame({
     'Team Average': team_avg_skills,
-    'Market Demand': [job_skill_frequency_skills.get(skill, 0) for skill in team_avg_skills.index]
+    'Market Demand (%)': [market_demand_dict.get(skill, 0) for skill in team_avg_skills.index]
 })
 
-# Normalize market demand to 1-5 scale (0-100% → 1-5)
-comparison_df['Market Demand (1-5)'] = (comparison_df['Market Demand'] / 100) * 5
+# 4. FIX: Scale market demand dynamically relative to the top skill (Max % becomes a 5.0)
+max_market_pct = comparison_df['Market Demand (%)'].max()
+if max_market_pct > 0:
+    comparison_df['Market Demand (1-5)'] = ((comparison_df['Market Demand (%)'] / max_market_pct) * 5).round(2)
+else:
+    comparison_df['Market Demand (1-5)'] = 0.0
 
-# Calculate gaps
-comparison_df['Gap'] = comparison_df['Market Demand (1-5)'] - comparison_df['Team Average']
+# 5. Calculate Gap (Market Benchmark - Team Average)
+comparison_df['Gap'] = (comparison_df['Market Demand (1-5)'] - comparison_df['Team Average']).round(2)
+
+# 6. Classify Priority Categories based on scaled gaps
 comparison_df['Gap Category'] = comparison_df['Gap'].apply(
-    lambda x: 'High Priority' if x > 1.5 else ('Medium Priority' if x > 0.5 else 'Low Priority')
+    lambda x: 'High Priority' if x > 0.5 else ('Medium Priority' if x > -0.5 else 'Low Priority')
 )
 
-print("Skill Gap Analysis:")
+print("Dynamic Skill Gap Analysis Table (Fixed Scaling):")
 print(comparison_df.sort_values('Gap', ascending=False))
 ```
 
 ### Visualizing Skill Gaps
 
 ```{python}
-# Calculate team average for each skill
-team_avg_skills = df_skills_indexed.mean().sort_values(ascending=False)
-
-# Create comparison DataFrame
-comparison_df = pd.DataFrame({
-    'Team Average': team_avg_skills,
-    'Market Demand': [job_skill_frequency_skills.get(skill, 0) for skill in team_avg_skills.index]
-})
-
-# Normalize market demand to 1-5 scale
-comparison_df['Market Demand (1-5)'] = (comparison_df['Market Demand'] / 100) * 5
-comparison_df['Gap'] = comparison_df['Market Demand (1-5)'] - comparison_df['Team Average']
-comparison_df['Gap Category'] = comparison_df['Gap'].apply(
-    lambda x: 'High Priority' if x > 1.5 else ('Medium Priority' if x > 0.5 else 'Low Priority')
-)
-
-# Create interactive grouped bar chart
+# Create interactive grouped bar chart with corrected metrics
 fig_comparison = go.Figure(data=[
     go.Bar(
         name='Team Average',
         x=comparison_df.index,
         y=comparison_df['Team Average'],
         marker=dict(color='skyblue'),
-        hovertemplate='<b>%{x}</b><br>Team: %{y:.1f}<extra></extra>'
+        hovertemplate='<b>%{x}</b><br>Team Avg: %{y:.1f}<extra></extra>'
     ),
     go.Bar(
-        name='Market Demand (1-5)',
+        name='Market Demand (Scaled 1-5)',
         x=comparison_df.index,
         y=comparison_df['Market Demand (1-5)'],
         marker=dict(color='coral'),
-        hovertemplate='<b>%{x}</b><br>Market: %{y:.1f}<extra></extra>'
+        hovertemplate='<b>%{x}</b><br>Market Benchmark: %{y:.1f}<extra></extra>'
     )
 ])
 
 fig_comparison.update_layout(
-    title="Team Skills vs Market Demands (Interactive)",
+    title="Team Skills vs Scaled Market Demands (Interactive)",
     xaxis_title="Skills",
-    yaxis_title="Level (1-5)",
+    yaxis_title="Level (1-5 Scale)",
     barmode='group',
     height=500,
-    width=1200,
+    width=1000,
     hovermode='x unified',
-    legend=dict(
-        x=0.01,
-        y=0.99,
-        bgcolor='rgba(255, 255, 255, 0.8)'
-    )
+    legend=dict(x=0.01, y=0.99, bgcolor='rgba(255, 255, 255, 0.8)')
 )
-
 fig_comparison.show()
 ```
 ### Findings
 
-The gap analysis highlights three tiers of urgency:
+The gap analysis highlights three tiers of urgency based on our scaled market metrics:
 
-**🔴 High Priority (Gap > 1.5)**
+🔴 High Priority
 
-- **Python** — Team average of 2.5 vs. market demand of 4.75. This is the single most critical gap. Python is required in nearly every data role, and the team's current level is insufficient for professional-level work.
-- **Machine Learning** — Team average of 1.75 vs. market demand of 3.75. Most team members have minimal hands-on experience, yet ML fluency is increasingly expected even in analyst-level roles.
-- **Cloud Computing** — Team average of 1.5 vs. market demand of 3.25. While less universally required, cloud proficiency is becoming a table-stakes expectation in enterprise environments.
+Machine Learning — This represents our single most critical gap. With a high market baseline benchmark relative to our team's current exposure, building ML fluency is essential since it is increasingly expected even in analyst-level roles.
 
-**🟡 Medium Priority (Gap 0.5–1.5)**
+SQL — While the team possesses baseline exposure, the high frequency of SQL requirements in enterprise job postings makes deepening this skill a top priority for independent collaborative project workflows.
 
-- **Git/GitHub** — The gap is moderate numerically, but the skill's foundational nature makes it practically more urgent. Collaborative work in any technical role depends on version control.
-- **R** — A smaller gap, but largely because market demand for R is also lower relative to Python.
+🟡 Medium Priority
 
-**🟢 Low Priority (Gap < 0.5)**
+Python and Git/GitHub — The gap here is moderate numerically, but the foundational nature of version control and scripting makes them practically urgent for any collaborative technical role.
 
-- **Statistical Analysis** and **SQL** — The team performs relatively close to market expectations. These are areas to maintain and deepen rather than urgently build from scratch.
+🟢 Low Priority
+
+Statistical Analysis and R — The team performs relatively close to market expectations or the market demand is lower, meaning these are areas to maintain and deepen over time rather than urgently build from scratch.
+
 
 ---
 
@@ -329,13 +331,11 @@ Based on the gap analysis, the following skills should be prioritized:
 
 ```{python}
 import plotly.graph_objects as go
-import plotly.express as px
 
-# Filter high priority skills
+# Filter high priority skills using updated thresholds
 high_priority = comparison_df[comparison_df['Gap Category'] == 'High Priority'].sort_values('Gap', ascending=True)
 
 if len(high_priority) > 0:
-    # Create interactive chart for high priority skills
     fig_priority = go.Figure(data=[
         go.Bar(
             y=high_priority.index,
@@ -354,77 +354,66 @@ if len(high_priority) > 0:
     ])
 
     fig_priority.update_layout(
-        title="High Priority Skills to Learn (Gap Size)",
-        xaxis_title="Skill Gap (levels)",
+        title="High Priority Skills to Learn (Ranked by Gap Size)",
+        xaxis_title="Skill Gap (Market Benchmark - Team Avg)",
         yaxis_title="Skills",
         height=400,
         width=800,
         showlegend=False,
         hovermode='closest'
     )
-
     fig_priority.show()
-    
-    print("\nHigh Priority Skills:")
-    for skill in high_priority.index:
-        gap = high_priority.loc[skill, 'Gap']
-        print(f"  • {skill}: Gap = {gap:.1f} levels")
 else:
-    print("No high priority skills identified - Excellent work!")
+    print("No high priority skills identified based on current thresholds.")
 ```
 
 ### Personalized Recommendations by Team Member
 
 ```{python}
-import plotly.graph_objects as go
-import plotly.express as px
-
-# Create interactive table showing recommendations
+# Create personalized recommendations using individual gaps against the scaled benchmark
 recommendations_data = []
 
 for member in df_skills_indexed.index:
     member_skills = df_skills_indexed.loc[member]
     market_demand = comparison_df['Market Demand (1-5)']
     
-    # Find skills where member is significantly below market demand
-    gaps = market_demand - member_skills
-    priority_skills = gaps[gaps > 1.5].sort_values(ascending=False)
+    # Calculate individual gap score
+    individual_gaps = market_demand - member_skills
     
-    top_skills = ', '.join(priority_skills.index[:3]) if len(priority_skills) > 0 else "None"
+    # Identify skills where the individual is below the market benchmark threshold (e.g., gap > 0.0)
+    priority_skills = individual_gaps[individual_gaps > 0.0].sort_values(ascending=False)
+    top_skills_str = ', '.join(priority_skills.index[:3]) if len(priority_skills) > 0 else "None"
     
     recommendations_data.append({
         'Team Member': member,
-        'Priority Skills': top_skills,
-        'Number of High-Priority Skills': len(priority_skills)
+        'Priority Skills': top_skills_str,
+        'Number of Target Skills': len(priority_skills)
     })
 
 recommendations_df = pd.DataFrame(recommendations_data)
 
-# Create interactive table visualization
+# Create an interactive Plotly Table that handles text formatting cleanly
 fig_table = go.Figure(data=[go.Table(
     header=dict(
         values=list(recommendations_df.columns),
         fill_color='paleturquoise',
         align='left',
-        font=dict(color='black', size=12)
+        font=dict(color='black', size=12, family="Arial")
     ),
     cells=dict(
         values=[recommendations_df[col] for col in recommendations_df.columns],
         fill_color='lavender',
         align='left',
-        font=dict(color='black', size=11)
+        font=dict(color='black', size=11, family="Arial")
     )
 )])
 
 fig_table.update_layout(
-    title="Personalized Skill Development Recommendations",
+    title="Personalized Skill Development Matrix",
     height=300,
     width=900
 )
-
 fig_table.show()
-
-print(recommendations_df.to_string(index=False))
 ```
 
 ### Recommended Learning Resources

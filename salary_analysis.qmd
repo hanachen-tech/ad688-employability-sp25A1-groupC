@@ -102,7 +102,7 @@ This analysis classifies job postings as AI-related if they include AI or machin
 ai_vs_non_ai_salary = spark.sql("""
 SELECT
     CASE
-        WHEN a.job_id IS NOT NULL THEN 'AI-related'
+        WHEN a.id IS NOT NULL THEN 'AI-related'
         ELSE 'Non-AI'
     END AS career_type,
     ROUND(AVG(CAST(j.salary AS DOUBLE)), 2) AS avg_salary,
@@ -111,13 +111,13 @@ SELECT
     COUNT(DISTINCT j.title_clean) AS unique_job_titles
 FROM job_postings j
 LEFT JOIN ai_job_ids a
-    ON j.id = a.job_id
+    ON j.id = a.id
 WHERE
     j.salary IS NOT NULL
     AND CAST(j.salary AS DOUBLE) > 0
 GROUP BY
     CASE
-        WHEN a.job_id IS NOT NULL THEN 'AI-related'
+        WHEN a.id IS NOT NULL THEN 'AI-related'
         ELSE 'Non-AI'
     END
 ORDER BY
@@ -146,13 +146,13 @@ AI-related postings are identified using both Lightcast skill tags and AI-relate
 salary_distribution = spark.sql("""
 SELECT
     CASE
-        WHEN a.job_id IS NOT NULL THEN 'AI-related'
+        WHEN a.id IS NOT NULL THEN 'AI-related'
         ELSE 'Non-AI'
     END AS career_type,
     CAST(j.salary AS DOUBLE) AS salary
 FROM job_postings j
 LEFT JOIN ai_job_ids a
-    ON j.id = a.job_id
+    ON j.id = a.id
 WHERE
     j.salary IS NOT NULL
     AND CAST(j.salary AS DOUBLE) > 0
@@ -189,9 +189,15 @@ This is consistent our introductory research which told us that AI-specialized r
 state_salary = spark.sql("""
 SELECT
     l.state_name,
-    j.career_type,
+    CASE
+        WHEN a.id IS NOT NULL THEN 'AI-related'
+        ELSE 'Non-AI'
+    END AS career_type,
     AVG(CAST(j.salary AS DOUBLE)) AS avg_salary
-FROM jobs_with_ai j
+FROM job_postings j
+LEFT JOIN ai_job_ids a
+    -- 🌟 關鍵修正：兩邊強制轉成 String，避免型態不一致對不上
+    ON CAST(j.id AS STRING) = CAST(a.id AS STRING)
 JOIN locations l
     ON j.location_id = l.location_id
 WHERE
@@ -199,7 +205,10 @@ WHERE
     AND CAST(j.salary AS DOUBLE) > 0
 GROUP BY
     l.state_name,
-    j.career_type
+    CASE
+        WHEN a.id IS NOT NULL THEN 'AI-related'
+        ELSE 'Non-AI'
+    END
 """)
 
 state_salary_pd = state_salary.toPandas()
@@ -213,7 +222,14 @@ pivot_df = (
     )
     .reset_index()
 )
+
+# 🌟 防禦性修正：確保不論如何 'AI-related' 和 'Non-AI' 欄位都存在，避免 dropna 噴 KeyError
+for col in ["AI-related", "Non-AI"]:
+    if col not in pivot_df.columns:
+        pivot_df[col] = None
+
 pivot_df = pivot_df.dropna(subset=["AI-related", "Non-AI"])
+
 pivot_df["premium_dollars"] = (
     pivot_df["AI-related"] -
     pivot_df["Non-AI"]
@@ -245,6 +261,8 @@ state_abbrev = {
 
 pivot_df["state_code"] = pivot_df["state_name"].map(state_abbrev)
 pivot_df = pivot_df.dropna(subset=["state_code"])
+
+import plotly.express as px
 
 fig_ai_premium = px.choropleth(
     pivot_df,
