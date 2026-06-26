@@ -20,33 +20,72 @@ execute:
 ## Prompt 1
 
 ```text
-
+Help me create the data cleaning section for a Lightcast job postings project in PySpark. The cleaning should remove unreliable job IDs, prepare salary fields, handle missing salary values, create cleaned job posting data, and save prepared tables for later EDA and modeling.
 ```
+
 ## AI Prompt
-```text
-
-```
 
 ```text
+AI was used to help structure the data cleaning workflow, organize the PySpark code, and explain the logic behind preparing salary data. The team reviewed the final code and outputs to make sure the cleaned dataset matched the project requirements.
 
+Short example:
+salary_regression_data.write.mode("overwrite").parquet(
+    "data/prepared/salary_regression_data.parquet"
+)
 ```
+
+## Prompt 2
+
+```text
+Help me create prepared tables for analysis and modeling from the cleaned Lightcast dataset. The prepared tables should include job postings, companies, industries, locations, occupations, skills, job-skill matches, AI-related job IDs, salary regression data, and salary classification data.
+```
+
 ## AI Prompt
-```text
-
-```
 
 ```text
+AI was used to help organize the prepared table creation process and explain how the fact and dimension tables connect. The team checked the row counts and table outputs before using them in EDA and modeling.
 
-
+Short example:
+job_postings.createOrReplaceTempView("job_postings")
+skills.createOrReplaceTempView("skills")
+job_skill_matches.createOrReplaceTempView("job_skill_matches")
 ```
+
+## Prompt 3
+
+```text
+Help me create an exploratory data analysis section for the cleaned Lightcast job postings dataset. Include salary availability, missing salary patterns, salary distribution, salary by employment type, salary by education and occupation, top states, top industries, occupation categories, and top skills.
+```
+
 ## AI Prompt
-```text
 
+```text
+AI was used to help design the EDA structure, write PySpark and Plotly code, and draft short explanations for each visualization. The charts and tables were generated from the cleaned dataset, and the team reviewed the results before including them in the final page.
+
+Short example:
+employment_salary = spark.sql("""
+SELECT
+    employment_type_name AS employment_type,
+    COUNT(*) AS job_count,
+    percentile_approx(salary, 0.5) AS median_salary
+FROM job_postings
+WHERE salary IS NOT NULL
+GROUP BY employment_type_name
+""").toPandas()
 ```
-```text
 
+## Prompt 4
+
+```text
+Help me debug PySpark and Quarto rendering errors in the data cleaning and EDA pages. Explain errors such as missing Spark temporary views, incorrect table names, syntax errors from putting markdown inside Python chunks, and rendering output issues.
 ```
 
-```text
+## AI Prompt
 
+```text
+AI was used to help identify and fix PySpark and Quarto errors during rendering. This included checking whether temporary views were created, moving markdown text outside Python code chunks, and correcting code blocks so the pages could render successfully.
+
+Short example:
+job_skill_matches_df = spark.read.parquet("data/prepared/job_skill_matches.parquet")
+job_skill_matches_df.createOrReplaceTempView("job_skill_matches")
 ```

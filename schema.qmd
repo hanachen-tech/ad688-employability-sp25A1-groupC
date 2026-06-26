@@ -1,0 +1,557 @@
+---
+title: "Star Schema Design"
+format:
+  html:
+    theme: cosmo
+    toc: true
+    toc-location: right
+    toc-depth: 2
+    code-fold: true
+    code-summary: "Show code"
+    embed-resources: true
+execute:
+  warning: false
+  message: false
+---
+
+# Star Schema Design
+
+## Overview
+
+This page documents the star schema created from the cleaned Lightcast job postings dataset. The prepared tables were created in `data_cleaning.qmd` and saved in the `data/prepared/` folder.
+
+The schema uses `job_postings` as the central fact table. The dimension tables describe companies, industries, locations, occupations, and skills. Because each job posting can have many skills, the schema also includes a bridge table called `job_skill_matches`.
+
+## 1. Start Spark Session and Load Prepared Tables
+
+```{python}
+#| echo: true
+#| warning: false
+#| message: false
+
+from pyspark.sql import SparkSession
+import pandas as pd
+
+spark = (
+    SparkSession.builder
+    .config("spark.driver.host", "localhost")
+    .appName("StarSchemaDesign")
+    .getOrCreate()
+)
+
+spark.sparkContext.setLogLevel("ERROR")
+
+def style_table(df, format_dict=None):
+
+    styled = df.style
+
+    if format_dict is not None:
+
+        styled = styled.format(format_dict)
+
+    styled = styled.set_properties(**{
+
+        "text-align": "left",
+
+        "white-space": "normal",
+
+        "border": "1px solid #ddd",
+
+        "padding": "6px"
+
+    }).set_table_styles([
+
+        {"selector": "th", "props": [
+
+            ("background-color", "#f6f8fa"),
+
+            ("color", "#24324b"),
+
+            ("font-weight", "bold"),
+
+            ("border", "1px solid #ddd"),
+
+            ("padding", "8px")
+
+        ]},
+
+        {"selector": "td", "props": [
+
+            ("border", "1px solid #ddd"),
+
+            ("padding", "6px")
+
+        ]},
+
+        {"selector": "table", "props": [
+
+            ("border-collapse", "collapse"),
+
+            ("width", "100%")
+
+        ]}
+
+    ])
+
+    return styled
+
+job_postings = spark.read.parquet("data/prepared/job_postings.parquet")
+
+companies = spark.read.parquet("data/prepared/companies.parquet")
+
+industries = spark.read.parquet("data/prepared/industries.parquet")
+
+locations = spark.read.parquet("data/prepared/locations.parquet")
+
+occupations = spark.read.parquet("data/prepared/occupations.parquet")
+
+skills = spark.read.parquet("data/prepared/skills.parquet")
+
+job_skill_matches = spark.read.parquet("data/prepared/job_skill_matches.parquet")
+
+job_postings.createOrReplaceTempView("fact_job_postings")
+
+companies.createOrReplaceTempView("dim_companies")
+
+industries.createOrReplaceTempView("dim_industries")
+
+locations.createOrReplaceTempView("dim_locations")
+
+occupations.createOrReplaceTempView("dim_occupations")
+
+skills.createOrReplaceTempView("dim_skills")
+
+job_skill_matches.createOrReplaceTempView("fact_job_skill_matches")
+
+```
+
+## 2. Star Schema Tables
+
+```{python}
+
+#| echo: true
+
+schema_summary = pd.DataFrame([
+
+    {
+
+        "table_type": "Fact Table",
+
+        "table_name": "Fact_JobPostings",
+
+        "dataframe": "job_postings",
+
+        "saved_file": "data/prepared/job_postings.parquet",
+
+        "description": "Central job posting table. Each row represents one unique job posting."
+
+    },
+
+    {
+
+        "table_type": "Bridge Fact Table",
+
+        "table_name": "Fact_JobSkillMatches",
+
+        "dataframe": "job_skill_matches",
+
+        "saved_file": "data/prepared/job_skill_matches.parquet",
+
+        "description": "Bridge table connecting job postings to skills."
+
+    },
+
+    {
+
+        "table_type": "Dimension Table",
+
+        "table_name": "Dim_Companies",
+
+        "dataframe": "companies",
+
+        "saved_file": "data/prepared/companies.parquet",
+
+        "description": "Company and employer information."
+
+    },
+
+    {
+
+        "table_type": "Dimension Table",
+
+        "table_name": "Dim_Industries",
+
+        "dataframe": "industries",
+
+        "saved_file": "data/prepared/industries.parquet",
+
+        "description": "NAICS industry code and industry name."
+
+    },
+
+    {
+
+        "table_type": "Dimension Table",
+
+        "table_name": "Dim_Locations",
+
+        "dataframe": "locations",
+
+        "saved_file": "data/prepared/locations.parquet",
+
+        "description": "City, state, county, and MSA location information."
+
+    },
+
+    {
+
+        "table_type": "Dimension Table",
+
+        "table_name": "Dim_Occupations",
+
+        "dataframe": "occupations",
+
+        "saved_file": "data/prepared/occupations.parquet",
+
+        "description": "SOC and Lightcast occupation information."
+
+    },
+
+    {
+
+        "table_type": "Dimension Table",
+
+        "table_name": "Dim_Skills",
+
+        "dataframe": "skills",
+
+        "saved_file": "data/prepared/skills.parquet",
+
+        "description": "Skill name and skill type."
+
+    }
+
+])
+
+display(style_table(schema_summary))
+
+```
+
+## 3. Row Counts
+
+```{python}
+
+#| echo: true
+
+row_counts = pd.DataFrame([
+
+    {"table_name": "Fact_JobPostings", "row_count": job_postings.count()},
+
+    {"table_name": "Fact_JobSkillMatches", "row_count": job_skill_matches.count()},
+
+    {"table_name": "Dim_Companies", "row_count": companies.count()},
+
+    {"table_name": "Dim_Industries", "row_count": industries.count()},
+
+    {"table_name": "Dim_Locations", "row_count": locations.count()},
+
+    {"table_name": "Dim_Occupations", "row_count": occupations.count()},
+
+    {"table_name": "Dim_Skills", "row_count": skills.count()}
+
+])
+
+display(style_table(row_counts, {
+
+    "row_count": "{:,.0f}"
+
+}))
+
+```
+
+## 4. Fact Table: Fact_JobPostings
+
+`Fact_JobPostings` is the central table in the schema. Each row represents one job posting. It stores salary, experience requirements, posting dates, and foreign keys that connect to dimension tables.
+
+```{python}
+
+#| echo: true
+
+fact_job_postings_columns = pd.DataFrame([
+
+    {"column_name": "id", "role": "Primary Key", "description": "Unique job posting ID."},
+
+    {"column_name": "title_clean", "role": "Descriptive Attribute", "description": "Cleaned job title."},
+
+    {"column_name": "company_id", "role": "Foreign Key", "description": "Connects to Dim_Companies."},
+
+    {"column_name": "industry_id", "role": "Foreign Key", "description": "Connects to Dim_Industries."},
+
+    {"column_name": "occupation_id", "role": "Foreign Key", "description": "Connects to Dim_Occupations."},
+
+    {"column_name": "location_id", "role": "Foreign Key", "description": "Connects to Dim_Locations."},
+
+    {"column_name": "employment_type_name", "role": "Descriptive Attribute", "description": "Employment type."},
+
+    {"column_name": "remote_type_name", "role": "Descriptive Attribute", "description": "Remote-work category."},
+
+    {"column_name": "min_years_experience", "role": "Measure", "description": "Minimum required years of experience."},
+
+    {"column_name": "max_years_experience", "role": "Measure", "description": "Maximum required years of experience."},
+
+    {"column_name": "original_salary", "role": "Measure", "description": "Original salary field."},
+
+    {"column_name": "salary_from", "role": "Measure", "description": "Lower salary bound."},
+
+    {"column_name": "salary_to", "role": "Measure", "description": "Upper salary bound."},
+
+    {"column_name": "observed_analysis_salary", "role": "Measure", "description": "Salary before imputation."},
+
+    {"column_name": "salary", "role": "Measure", "description": "Final salary after qualified industry-median imputation."},
+
+    {"column_name": "salary_imputation_status", "role": "Descriptive Attribute", "description": "Observed, imputed, or missing salary status."},
+
+    {"column_name": "posted_date", "role": "Date Attribute", "description": "Parsed posting date."},
+
+    {"column_name": "posted", "role": "Date Attribute", "description": "Original posted date field."},
+
+    {"column_name": "expired", "role": "Date Attribute", "description": "Expiration date field."},
+
+    {"column_name": "duration", "role": "Measure", "description": "Posting duration."}
+
+])
+
+display(style_table(fact_job_postings_columns))
+
+```
+
+## 5. Dimension Tables
+
+```{python}
+
+#| echo: true
+
+dimension_summary = pd.DataFrame([
+
+    {
+
+        "dimension_table": "Dim_Companies",
+
+        "key": "company_id",
+
+        "main_columns": "company, company_name, company_raw, company_is_staffing"
+
+    },
+
+    {
+
+        "dimension_table": "Dim_Industries",
+
+        "key": "industry_id",
+
+        "main_columns": "naics_2022_6, naics_2022_6_name"
+
+    },
+
+    {
+
+        "dimension_table": "Dim_Locations",
+
+        "key": "location_id",
+
+        "main_columns": "location, city_name, state_name, county_name, msa, msa_name"
+
+    },
+
+    {
+
+        "dimension_table": "Dim_Occupations",
+
+        "key": "occupation_id",
+
+        "main_columns": "soc_5, soc_5_name, specialized_occupation_name, occupation_group_name"
+
+    },
+
+    {
+
+        "dimension_table": "Dim_Skills",
+
+        "key": "skill_id",
+
+        "main_columns": "skill_name, skill_type"
+
+    }
+
+])
+
+display(style_table(dimension_summary))
+
+```
+
+## 6. Bridge Table: Fact_JobSkillMatches
+
+A job posting can contain multiple skills, and the same skill can appear in many job postings. Therefore, the schema uses `Fact_JobSkillMatches` as a bridge table between `Fact_JobPostings` and `Dim_Skills`.
+
+```{python}
+
+#| echo: true
+
+bridge_columns = pd.DataFrame([
+
+    {"column_name": "job_id", "role": "Foreign Key", "description": "Connects to Fact_JobPostings.id."},
+
+    {"column_name": "skill_id", "role": "Foreign Key", "description": "Connects to Dim_Skills.skill_id."},
+
+    {"column_name": "skill_name", "role": "Descriptive Attribute", "description": "Skill name."},
+
+    {"column_name": "skill_type", "role": "Descriptive Attribute", "description": "Skill category such as common, specialized, software, or certification."}
+
+])
+
+display(style_table(bridge_columns))
+
+```
+
+## 7. Relationship Summary
+
+```{python}
+
+#| echo: true
+
+relationship_summary = pd.DataFrame([
+
+    {"from_table": "Fact_JobPostings", "from_key": "company_id", "to_table": "Dim_Companies", "to_key": "company_id"},
+
+    {"from_table": "Fact_JobPostings", "from_key": "industry_id", "to_table": "Dim_Industries", "to_key": "industry_id"},
+
+    {"from_table": "Fact_JobPostings", "from_key": "location_id", "to_table": "Dim_Locations", "to_key": "location_id"},
+
+    {"from_table": "Fact_JobPostings", "from_key": "occupation_id", "to_table": "Dim_Occupations", "to_key": "occupation_id"},
+
+    {"from_table": "Fact_JobSkillMatches", "from_key": "job_id", "to_table": "Fact_JobPostings", "to_key": "id"},
+
+    {"from_table": "Fact_JobSkillMatches", "from_key": "skill_id", "to_table": "Dim_Skills", "to_key": "skill_id"}
+
+])
+
+display(style_table(relationship_summary))
+
+```
+
+## 8. Star Schema Diagram
+
+```text
+
+                         Dim_Companies
+
+                              |
+
+                              |
+
+Dim_Industries ---- Fact_JobPostings ---- Dim_Locations
+
+                              |
+
+                              |
+
+                       Dim_Occupations
+
+                              |
+
+                              |
+
+                    Fact_JobSkillMatches
+
+                              |
+
+                              |
+
+                          Dim_Skills
+
+```
+
+## 9. Join Validation Check
+
+```{python}
+
+#| echo: true
+
+join_validation = spark.sql("""
+
+SELECT
+
+    COUNT(*) AS total_job_postings,
+
+    SUM(CASE WHEN company_id IS NOT NULL THEN 1 ELSE 0 END) AS jobs_with_company_key,
+
+    SUM(CASE WHEN industry_id IS NOT NULL THEN 1 ELSE 0 END) AS jobs_with_industry_key,
+
+    SUM(CASE WHEN location_id IS NOT NULL THEN 1 ELSE 0 END) AS jobs_with_location_key,
+
+    SUM(CASE WHEN occupation_id IS NOT NULL THEN 1 ELSE 0 END) AS jobs_with_occupation_key
+
+FROM fact_job_postings
+
+""").toPandas()
+
+display(style_table(join_validation, {
+
+    "total_job_postings": "{:,.0f}",
+
+    "jobs_with_company_key": "{:,.0f}",
+
+    "jobs_with_industry_key": "{:,.0f}",
+
+    "jobs_with_location_key": "{:,.0f}",
+
+    "jobs_with_occupation_key": "{:,.0f}"
+
+}))
+
+```
+
+## 10. Example Analytical Query
+
+This example uses the fact table and location dimension to calculate average salary and job count by state.
+
+```{python}
+
+#| echo: true
+
+salary_by_state = spark.sql("""
+
+SELECT
+
+    l.state_name,
+
+    COUNT(*) AS job_count,
+
+    ROUND(AVG(f.salary), 2) AS average_salary
+
+FROM fact_job_postings f
+
+LEFT JOIN dim_locations l
+
+    ON f.location_id = l.location_id
+
+WHERE f.salary IS NOT NULL
+
+GROUP BY l.state_name
+
+ORDER BY job_count DESC
+
+LIMIT 10
+
+""").toPandas()
+
+display(style_table(salary_by_state, {
+
+    "job_count": "{:,.0f}",
+
+    "average_salary": "${:,.2f}"
+
+}))
+
+```
+
