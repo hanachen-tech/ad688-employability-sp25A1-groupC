@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.38">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Afreen Alam, Nutchanon Chaiyaratana, Lo Ying Wu">
+<meta name="dcterms.date" content="2026-06-26">
+
+<title>AI Disclosure – Job Market Analysis 2024</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<script src="site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap-867c02b1b21f194c4f82e8e5b733d519.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="styles.css">
+</head>
+
+<body class="nav-fixed quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="./index.html">
+    <span class="navbar-title">Job Market Analysis 2024</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="./index.html"> 
+<span class="menu-text">Home</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./introduction.html"> 
+<span class="menu-text">Project Overview</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./data_cleaning.html"> 
+<span class="menu-text">Data Preparation</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./eda.html"> 
+<span class="menu-text">Exploratory Analysis</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./skill_gap_analysis.html"> 
+<span class="menu-text">Skill Gap Analysis</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./salary_analysis.html"> 
+<span class="menu-text">Salary Analysis</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./MLR.html"> 
+<span class="menu-text">Predictive Modeling</span></a>
+  </li>  
+  <li class="nav-item">
+    <a class="nav-link" href="./career_plan.html"> 
+<span class="menu-text">Career Strategy</span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul class="collapse">
+  <li><a href="#prompt-1" id="toc-prompt-1" class="nav-link active" data-scroll-target="#prompt-1"><span class="header-section-number">1</span> Prompt 1</a></li>
+  <li><a href="#ai-prompt" id="toc-ai-prompt" class="nav-link" data-scroll-target="#ai-prompt"><span class="header-section-number">2</span> AI Prompt</a></li>
+  <li><a href="#prompt-2" id="toc-prompt-2" class="nav-link" data-scroll-target="#prompt-2"><span class="header-section-number">3</span> Prompt 2</a></li>
+  <li><a href="#ai-prompt-1" id="toc-ai-prompt-1" class="nav-link" data-scroll-target="#ai-prompt-1"><span class="header-section-number">4</span> AI Prompt</a></li>
+  <li><a href="#prompt-3" id="toc-prompt-3" class="nav-link" data-scroll-target="#prompt-3"><span class="header-section-number">5</span> Prompt 3</a></li>
+  <li><a href="#ai-prompt-2" id="toc-ai-prompt-2" class="nav-link" data-scroll-target="#ai-prompt-2"><span class="header-section-number">6</span> AI Prompt</a></li>
+  <li><a href="#prompt-4" id="toc-prompt-4" class="nav-link" data-scroll-target="#prompt-4"><span class="header-section-number">7</span> Prompt 4</a></li>
+  <li><a href="#ai-prompt-3" id="toc-ai-prompt-3" class="nav-link" data-scroll-target="#ai-prompt-3"><span class="header-section-number">8</span> AI Prompt</a></li>
+  <li><a href="#prompt-5" id="toc-prompt-5" class="nav-link" data-scroll-target="#prompt-5"><span class="header-section-number">9</span> Prompt 5</a></li>
+  <li><a href="#ai-prompt-4" id="toc-ai-prompt-4" class="nav-link" data-scroll-target="#ai-prompt-4"><span class="header-section-number">10</span> AI Prompt</a></li>
+  <li><a href="#prompt-6" id="toc-prompt-6" class="nav-link" data-scroll-target="#prompt-6"><span class="header-section-number">11</span> Prompt 6</a></li>
+  <li><a href="#ai-prompt-5" id="toc-ai-prompt-5" class="nav-link" data-scroll-target="#ai-prompt-5"><span class="header-section-number">12</span> AI Prompt</a></li>
+  <li><a href="#prompt-7" id="toc-prompt-7" class="nav-link" data-scroll-target="#prompt-7"><span class="header-section-number">13</span> Prompt 7</a></li>
+  <li><a href="#ai-prompt-6" id="toc-ai-prompt-6" class="nav-link" data-scroll-target="#ai-prompt-6"><span class="header-section-number">14</span> AI Prompt</a></li>
+  <li><a href="#ai-prompt-7" id="toc-ai-prompt-7" class="nav-link" data-scroll-target="#ai-prompt-7"><span class="header-section-number">15</span> AI Prompt</a></li>
+  <li><a href="#prompt-9" id="toc-prompt-9" class="nav-link" data-scroll-target="#prompt-9"><span class="header-section-number">16</span> Prompt 9</a></li>
+  <li><a href="#ai-prompt-8" id="toc-ai-prompt-8" class="nav-link" data-scroll-target="#ai-prompt-8"><span class="header-section-number">17</span> AI Prompt</a></li>
+  <li><a href="#ai-prompt-9" id="toc-ai-prompt-9" class="nav-link" data-scroll-target="#ai-prompt-9"><span class="header-section-number">18</span> AI Prompt</a></li>
+  <li><a href="#prompt-11" id="toc-prompt-11" class="nav-link" data-scroll-target="#prompt-11"><span class="header-section-number">19</span> Prompt 11</a></li>
+  <li><a href="#ai-prompt-10" id="toc-ai-prompt-10" class="nav-link" data-scroll-target="#ai-prompt-10"><span class="header-section-number">20</span> AI Prompt</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">AI Disclosure</h1>
+<p class="subtitle lead">AI Assistance Disclosure</p>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p>Afreen Alam, Nutchanon Chaiyaratana, Lo Ying Wu </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">June 26, 2026</p>
+    </div>
+  </div>
+  
+    <div>
+    <div class="quarto-title-meta-heading">Modified</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date-modified">June 26, 2026</p>
+    </div>
+  </div>
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="prompt-1" class="level2" data-number="1">
+<h2 data-number="1" class="anchored" data-anchor-id="prompt-1"><span class="header-section-number">1</span> Prompt 1</h2>
+<pre class="text"><code>Help me create the data cleaning section for a Lightcast job postings project in PySpark. The cleaning should remove unreliable job IDs, prepare salary fields, handle missing salary values, create cleaned job posting data, and save prepared tables for later EDA and modeling.</code></pre>
+</section>
+<section id="ai-prompt" class="level2" data-number="2">
+<h2 data-number="2" class="anchored" data-anchor-id="ai-prompt"><span class="header-section-number">2</span> AI Prompt</h2>
+<pre class="text"><code>AI was used to help structure the data cleaning workflow, organize the PySpark code, and explain the logic behind preparing salary data. The team reviewed the final code and outputs to make sure the cleaned dataset matched the project requirements.
+
+Short example:
+salary_regression_data.write.mode("overwrite").parquet(
+    "data/prepared/salary_regression_data.parquet"
+)</code></pre>
+</section>
+<section id="prompt-2" class="level2" data-number="3">
+<h2 data-number="3" class="anchored" data-anchor-id="prompt-2"><span class="header-section-number">3</span> Prompt 2</h2>
+<pre class="text"><code>Help me create prepared tables for analysis and modeling from the cleaned Lightcast dataset. The prepared tables should include job postings, companies, industries, locations, occupations, skills, job-skill matches, AI-related job IDs, salary regression data, and salary classification data.</code></pre>
+</section>
+<section id="ai-prompt-1" class="level2" data-number="4">
+<h2 data-number="4" class="anchored" data-anchor-id="ai-prompt-1"><span class="header-section-number">4</span> AI Prompt</h2>
+<pre class="text"><code>AI was used to help organize the prepared table creation process and explain how the fact and dimension tables connect. The team checked the row counts and table outputs before using them in EDA and modeling.
+
+Short example:
+job_postings.createOrReplaceTempView("job_postings")
+skills.createOrReplaceTempView("skills")
+job_skill_matches.createOrReplaceTempView("job_skill_matches")</code></pre>
+</section>
+<section id="prompt-3" class="level2" data-number="5">
+<h2 data-number="5" class="anchored" data-anchor-id="prompt-3"><span class="header-section-number">5</span> Prompt 3</h2>
+<pre class="text"><code>Help me create an exploratory data analysis section for the cleaned Lightcast job postings dataset. Include salary availability, missing salary patterns, salary distribution, salary by employment type, salary by education and occupation, top states, top industries, occupation categories, and top skills.</code></pre>
+</section>
+<section id="ai-prompt-2" class="level2" data-number="6">
+<h2 data-number="6" class="anchored" data-anchor-id="ai-prompt-2"><span class="header-section-number">6</span> AI Prompt</h2>
+<pre class="text"><code>AI was used to help design the EDA structure, write PySpark and Plotly code, and draft short explanations for each visualization. The charts and tables were generated from the cleaned dataset, and the team reviewed the results before including them in the final page.
+
+Short example:
+employment_salary = spark.sql("""
+SELECT
+    employment_type_name AS employment_type,
+    COUNT(*) AS job_count,
+    percentile_approx(salary, 0.5) AS median_salary
+FROM job_postings
+WHERE salary IS NOT NULL
+GROUP BY employment_type_name
+""").toPandas()</code></pre>
+</section>
+<section id="prompt-4" class="level2" data-number="7">
+<h2 data-number="7" class="anchored" data-anchor-id="prompt-4"><span class="header-section-number">7</span> Prompt 4</h2>
+<pre class="text"><code>Help me debug PySpark and Quarto rendering errors in the data cleaning and EDA pages. Explain errors such as missing Spark temporary views, incorrect table names, syntax errors from putting markdown inside Python chunks, and rendering output issues.</code></pre>
+</section>
+<section id="ai-prompt-3" class="level2" data-number="8">
+<h2 data-number="8" class="anchored" data-anchor-id="ai-prompt-3"><span class="header-section-number">8</span> AI Prompt</h2>
+<pre class="text"><code>AI was used to help identify and fix PySpark and Quarto errors during rendering. This included checking whether temporary views were created, moving markdown text outside Python code chunks, and correcting code blocks so the pages could render successfully.
+
+Short example:
+job_skill_matches_df = spark.read.parquet("data/prepared/job_skill_matches.parquet")
+job_skill_matches_df.createOrReplaceTempView("job_skill_matches")</code></pre>
+</section>
+<section id="prompt-5" class="level2" data-number="9">
+<h2 data-number="9" class="anchored" data-anchor-id="prompt-5"><span class="header-section-number">9</span> Prompt 5</h2>
+<pre class="text"><code>i want to position legend at the bottom so the chart is wider</code></pre>
+</section>
+<section id="ai-prompt-4" class="level2" data-number="10">
+<h2 data-number="10" class="anchored" data-anchor-id="ai-prompt-4"><span class="header-section-number">10</span> AI Prompt</h2>
+<pre class="text"><code>Yes — move the legend from the right to the bottom using legend inside update_layout. This frees up horizontal space so the actual plotting area becomes much wider.
+
+Add this to your fig_industry.update_layout(...):
+
+legend=dict(
+    orientation="h",      # horizontal legend
+    yanchor="top",
+    y=-0.35,              # push below chart
+    xanchor="center",
+    x=0.5,                # center legend
+    title_text="Industry"
+)</code></pre>
+</section>
+<section id="prompt-6" class="level2" data-number="11">
+<h2 data-number="11" class="anchored" data-anchor-id="prompt-6"><span class="header-section-number">11</span> Prompt 6</h2>
+<pre class="text"><code>the dropdown filter is too close to the chart, i want it to be higher so it is not blocking the chart</code></pre>
+</section>
+<section id="ai-prompt-5" class="level2" data-number="12">
+<h2 data-number="12" class="anchored" data-anchor-id="ai-prompt-5"><span class="header-section-number">12</span> AI Prompt</h2>
+<pre class="text"><code>Yep — the dropdown is overlapping because its y position is still inside the plotting area.
+
+Right now you likely have:
+
+y=1.08
+
+In Plotly, the updatemenu coordinates are relative to the plot area, not the whole figure. So to move it higher, you need both:
+
+Increase y
+Increase top margin (margin.t)
+Fix
+
+Change this:
+
+updatemenus=[
+    dict(
+        active=0,
+        direction="down",
+        x=0,
+        y=1.08,
+        xanchor="left",
+        yanchor="top",
+        buttons=buttons
+    )
+]
+
+to:
+
+updatemenus=[
+    dict(
+        active=0,
+        direction="down",
+        x=0.05,
+        y=1.22,          # move higher
+        xanchor="left",
+        yanchor="top",
+        buttons=buttons
+    )
+]</code></pre>
+</section>
+<section id="prompt-7" class="level2" data-number="13">
+<h2 data-number="13" class="anchored" data-anchor-id="prompt-7"><span class="header-section-number">13</span> Prompt 7</h2>
+<pre class="text"><code>how can i improve the formating of my plotly dashboard in my quarto qmd file</code></pre>
+</section>
+<section id="ai-prompt-6" class="level2" data-number="14">
+<h2 data-number="14" class="anchored" data-anchor-id="ai-prompt-6"><span class="header-section-number">14</span> AI Prompt</h2>
+<pre class="text"><code>Oof, yes. We have a classic case of the "Plotly Subplot Crunch." When you combine totally different chart types (like box plots, a choropleth map with a massive colorbar, and multiple line graphs) into a single standard subplot grid, they fight for screen real estate, resulting in overlapping text and compressed charts.
+
+Since you are already using Quarto (.qmd), the absolute best way to fix this isn't by forcing everything into one monster make_subplots object. Instead, you should let Quarto's native dashboard layout grid handle the positioning.
+The Solution: Quarto Layout Panels
+You can use standard markdown headers to separate your narrative from your dashboard, and then use Quarto's layout-ncol or a layout div to cleanly arrange independent Plotly figures.
+
+By separating the figures, you eliminate the crushed spacing and messy overlapping legends seen in image_9bd24c.jpg. Utilize the below structure to create it.
+
+---
+# (Your existing YAML header remains unchanged)
+---
+
+(Your existing text, tables, and analysis go here...)
+
+---
+
+## Salary &amp; Compensation Trends Dashboard
+
+Here is a visual breakdown of current market trends.
+
+::: {#dashboard-layout layout="[[50, 50], [50, 50]]"}
+
+
+
+## Prompt 8
+```text
+how can i add a dropdown filter to a plotly plot?</code></pre>
+</section>
+<section id="ai-prompt-7" class="level2" data-number="15">
+<h2 data-number="15" class="anchored" data-anchor-id="ai-prompt-7"><span class="header-section-number">15</span> AI Prompt</h2>
+<pre class="text"><code>To add a dropdown filter directly into a standalone Plotly plot, you must pre-render all possible data groups as separate data traces, and then use the updatemenus property to toggle their visibility.Because client-side JavaScript plots cannot dynamically query a Python backend or filter raw pandas DataFrames on the fly, hiding and showing pre-loaded traces is the standard approach for native Plotly files.Core Implementation StrategyAdd a separate trace to the figure for each unique category in your data.Build a button list inside updatemenus, where each button uses the "restyle" method.Pass a boolean visibility list (e.g., [True, False, False]) via the visible parameter inside the button arguments to show only the selected group.Step-by-Step Code ExampleThe code snippet below groups a dataset by a specific category, builds individual data traces, and maps them to a native dropdown menu:pythonimport plotly.graph_objects as go
+import pandas as pd
+
+# 1. Mock Data Setup
+data = {
+    'X': [1, 2, 3, 1, 2, 3, 1, 2, 3],
+    'Y': [10, 11, 12, 20, 22, 24, 5, 6, 7],
+    'Category': ['Group A', 'Group A', 'Group A', 'Group B', 'Group B', 'Group B', 'Group C', 'Group C', 'Group C']
+}
+df = pd.DataFrame(data)
+
+fig = go.Figure()
+categories = df['Category'].unique()
+
+# 2. Add a separate trace for every category
+for cat in categories:
+    df_filtered = df[df['Category'] == cat]
+    fig.add_trace(
+        go.Scatter(
+            x=df_filtered['X'], 
+            y=df_filtered['Y'], 
+            mode='markers+lines', 
+            name=cat,
+            visible=True  # All groups visible by default
+        )
+    )
+
+# 3. Construct dropdown buttons dynamically
+dropdown_buttons = []
+
+# Add an "All Groups" option first
+dropdown_buttons.append({
+    "label": "All Groups",
+    "method": "restyle",
+    "args": [{"visible": [True] * len(categories)}]
+})
+
+# Add a button for each specific category
+for i, cat in enumerate(categories):
+    # Set the targeted group trace to True, and all others to False
+    visibility_mask = [False] * len(categories)
+    visibility_mask[i] = True
+    
+    dropdown_buttons.append({
+        "label": cat,
+        "method": "restyle",
+        "args": [{"visible": visibility_mask}]
+    })
+
+# 4. Inject the buttons into the layout updatemenus property
+fig.update_layout(
+    updatemenus=[{
+        "buttons": dropdown_buttons,
+        "direction": "down",
+        "showactive": True,
+        "x": 0.1,
+        "xanchor": "left",
+        "y": 1.15,
+        "yanchor": "top"
+    }],
+    title="Interactive Dropdown Filtering",
+    xaxis_title="X Axis",
+    yaxis_title="Y Axis"
+)
+
+fig.show()</code></pre>
+</section>
+<section id="prompt-9" class="level2" data-number="16">
+<h2 data-number="16" class="anchored" data-anchor-id="prompt-9"><span class="header-section-number">16</span> Prompt 9</h2>
+<pre class="text"><code>This is content my teammate created. He used "Use Multiple Linear Regression to model salary based on location, job title, skills, remote type, employment type, minimum experience, and education level" as Model 1, then added occupation as Model 2. I want to follow this same format and use Model 2's data to build a Random Forest model, then append my results after the existing content. I know what the output should look like and have a general idea of how to approach it, but I need help with the detailed implementation.</code></pre>
+</section>
+<section id="ai-prompt-8" class="level2" data-number="17">
+<h2 data-number="17" class="anchored" data-anchor-id="ai-prompt-8"><span class="header-section-number">17</span> AI Prompt</h2>
+<pre class="text"><code>
+I confirmed that for a fair comparison, Model 3 should reuse Model 2's already-fitted pipeline to transform the data into feature vectors, rather than rebuilding the StringIndexer/OneHotEncoder stages from scratch:
+
+```python
+train_features_model3 = model2.transform(train_model2).select("features", "salary")
+test_features_model3 = model2.transform(test_model2).select("features", "salary")</code></pre>
+<p>This guarantees Model 3 is evaluated on an identical feature representation to Model 2 (including occupation group and specialized occupation), so any difference in R², RMSE, or MAE reflects the choice of model itself rather than differences in feature engineering. I then replaced the LinearRegression estimator with RandomForestRegressor, kept the same evaluation metrics and Adjusted R² calculation for consistency with Models 1 and 2, and produced a feature importance table in place of the coefficient table — noting that importance scores and coefficients are not directly comparable, since importance has no direction while coefficients indicate both direction and dollar impact.</p>
+<p>Before handing off the code, I set up a synthetic PySpark environment to verify the logic ran correctly, including testing a high-cardinality categorical column similar to “specialized occupation” to confirm it wouldn’t break the model.</p>
+<p>I also flagged several design decisions for the team to be aware of: reusing one-hot encoded features (rather than native categorical indices) prioritizes a fair comparison over Random Forest’s best practice, Adjusted R² is reported only for table consistency since it is not a standard Random Forest evaluation metric, and the model used default hyperparameters (100 trees, max depth 10) without tuning — cross-validation could be added later if needed.</p>
+<pre><code>
+## Prompt 10
+```text
+My professor said MAE and RMSE need to include the max and min values, so we know whether the error is large or small. "Yeah we can compare against the max, min and median values from the violin plot in salary analysis to say this much deviation is ok" -- this is what my teammate said in the group chat. I want to incorporate this idea. Do you think I should add this explanation only in the final comparison table, or explain it as soon as MAE/RMSE first appear in Model 1?</code></pre>
+</section>
+<section id="ai-prompt-9" class="level2" data-number="18">
+<h2 data-number="18" class="anchored" data-anchor-id="ai-prompt-9"><span class="header-section-number">18</span> AI Prompt</h2>
+<pre class="text"><code>
+I recommended introducing the salary benchmark in Model 1, where MAE and RMSE first appear, rather than waiting until the Final Comparison table. My reasoning: the first time a reader sees a number like \$36,527, they need context to judge whether it's large or small — if the benchmark only appears at the end, both the Model 1 and Model 2 sections leave the reader without that context in the meantime.
+
+I also suggested establishing the benchmark once and reusing it across all three models rather than re-explaining it each time — once Model 1 states the median, min, and max salary and expresses RMSE as a percentage of the median, Model 2 and Model 3 can simply reference that same benchmark (e.g., "relative to the median established earlier, this model's error is N%") instead of repeating the full explanation.
+
+Concretely, I proposed computing the benchmark once as reusable values rather than just describing it in prose:
+
+- In the Model 1 section, add the median/min/max salary alongside the metrics table (computed directly from the dataset, consistent with the violin plot numbers from the team's salary analysis).
+- Add a column to each model's metrics table showing "RMSE/MAE as % of Median Salary," so the reader doesn't have to do the math themselves.
+- In the Final Comparison section, simply reference the benchmark already established, e.g., "relative to the median salary noted earlier, RMSE drops from X% to Y% to Z% across the three models."
+
+This directly reflects the logic the teammate raised in the group chat — comparing against the max, min, and median from the violin plot to judge whether a given deviation is acceptable — while only requiring the benchmark to be computed once rather than re-derived in every section.</code></pre>
+</section>
+<section id="prompt-11" class="level2" data-number="19">
+<h2 data-number="19" class="anchored" data-anchor-id="prompt-11"><span class="header-section-number">19</span> Prompt 11</h2>
+<pre class="text"><code>How do I check only this line:
+df_salary1.filter(col("salary") &lt; 20000).select("salary", "title_grouped").show(10)</code></pre>
+</section>
+<section id="ai-prompt-10" class="level2" data-number="20">
+<h2 data-number="20" class="anchored" data-anchor-id="ai-prompt-10"><span class="header-section-number">20</span> AI Prompt</h2>
+<pre class="text"><code>
+I explained that this was the same situation as running `categorical_cols_model3` in isolation earlier, so the same approach applied. The key dependency: `df_salary1` is defined in the Model 1 code chunk (in the `df_model1_base.filter(...)` block), so this check can only run after `df_salary1` already exists in memory.
+
+I walked through the Quarto interactive approach in VS Code:
+
+1. Confirm the file type in the bottom-right status bar shows "Quarto" rather than "Plain Text."
+2. Find the code chunk in Model 1 that defines `df_salary1`, click into it, and use "Run Above" to build everything before it (Spark session, `df_model1_base`, `df_salary1`).
+3. Type the check line anywhere — for example, below the `salary_stats_model1` chunk:
+```python
+df_salary1.filter(col("salary") &lt; 20000).select("salary", "title_grouped").show(10)</code></pre>
+<ol start="4" type="1">
+<li>Select just that line and press Shift+Enter — VS Code sends only the selection to the kernel as a temporary cell and prints the result.</li>
+</ol>
+<p>I also offered an alternative for those who’d rather not add a separate line: temporarily append the check to the end of the existing <code>salary_stats_model1 = df_salary1.selectExpr(...)</code> chunk and use “Run Cell” instead of “Run Above,” since that chunk already depends on <code>df_salary1</code>. After reviewing the output, the line should be removed so it doesn’t remain in the final version of the file.</p>
+<p>As a fallback if the interactive run option still wasn’t available, I suggested temporarily adding <code>raise SystemExit("...")</code> after the check line and running a full <code>quarto render</code> — this halts execution at that point instead of running through the entire document, the same workaround used previously. ```</p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/hanachen-tech\.github\.io\/ad688-employability-sp25A1-groupC\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

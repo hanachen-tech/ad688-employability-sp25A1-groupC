@@ -2,23 +2,27 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://hanachen-tech.github.io/ad688-employability-sp25A1-groupC/skill_gap_analysis.html</loc>
-    <lastmod>2026-06-25T17:53:38.101Z</lastmod>
+    <lastmod>2026-06-26T05:01:12.968Z</lastmod>
   </url>
   <url>
     <loc>https://hanachen-tech.github.io/ad688-employability-sp25A1-groupC/research_introduction.html</loc>
     <lastmod>2026-06-25T17:53:37.988Z</lastmod>
   </url>
   <url>
-    <loc>https://hanachen-tech.github.io/ad688-employability-sp25A1-groupC/eda.html</loc>
+    <loc>https://hanachen-tech.github.io/ad688-employability-sp25A1-groupC/schema.html</loc>
+    <lastmod>2026-06-26T04:32:05.092Z</lastmod>
+  </url>
+  <url>
+    <loc>https://hanachen-tech.github.io/ad688-employability-sp25A1-groupC/index.html</loc>
     <lastmod>2026-06-25T17:53:37.941Z</lastmod>
   </url>
   <url>
-    <loc>https://hanachen-tech.github.io/ad688-employability-sp25A1-groupC/ml_methods.html</loc>
-    <lastmod>2026-06-19T01:35:44.036Z</lastmod>
+    <loc>https://hanachen-tech.github.io/ad688-employability-sp25A1-groupC/about.html</loc>
+    <lastmod>2026-05-29T01:34:49.284Z</lastmod>
   </url>
   <url>
-    <loc>https://hanachen-tech.github.io/ad688-employability-sp25A1-groupC/MLR2.html</loc>
-    <lastmod>2026-06-25T01:08:44.282Z</lastmod>
+    <loc>https://hanachen-tech.github.io/ad688-employability-sp25A1-groupC/MLR3.html</loc>
+    <lastmod>2026-06-25T17:53:36.488Z</lastmod>
   </url>
   <url>
     <loc>https://hanachen-tech.github.io/ad688-employability-sp25A1-groupC/ml_methods_rf.html</loc>
@@ -30,7 +34,7 @@
   </url>
   <url>
     <loc>https://hanachen-tech.github.io/ad688-employability-sp25A1-groupC/salary_analysis.html</loc>
-    <lastmod>2026-06-25T17:53:38.089Z</lastmod>
+    <lastmod>2026-06-26T15:27:43.022Z</lastmod>
   </url>
   <url>
     <loc>https://hanachen-tech.github.io/ad688-employability-sp25A1-groupC/introduction.html</loc>
@@ -45,15 +49,19 @@
     <lastmod>2026-06-25T17:53:36.488Z</lastmod>
   </url>
   <url>
-    <loc>https://hanachen-tech.github.io/ad688-employability-sp25A1-groupC/MLR3.html</loc>
-    <lastmod>2026-06-25T17:53:36.488Z</lastmod>
+    <loc>https://hanachen-tech.github.io/ad688-employability-sp25A1-groupC/AI_disclosure.html</loc>
+    <lastmod>2026-06-26T05:00:02.882Z</lastmod>
   </url>
   <url>
-    <loc>https://hanachen-tech.github.io/ad688-employability-sp25A1-groupC/about.html</loc>
-    <lastmod>2026-05-29T01:34:49.284Z</lastmod>
+    <loc>https://hanachen-tech.github.io/ad688-employability-sp25A1-groupC/MLR2.html</loc>
+    <lastmod>2026-06-25T01:08:44.282Z</lastmod>
   </url>
   <url>
-    <loc>https://hanachen-tech.github.io/ad688-employability-sp25A1-groupC/index.html</loc>
+    <loc>https://hanachen-tech.github.io/ad688-employability-sp25A1-groupC/ml_methods.html</loc>
+    <lastmod>2026-06-19T01:35:44.036Z</lastmod>
+  </url>
+  <url>
+    <loc>https://hanachen-tech.github.io/ad688-employability-sp25A1-groupC/eda.html</loc>
     <lastmod>2026-06-25T17:53:37.941Z</lastmod>
   </url>
   <url>
