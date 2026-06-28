@@ -102,10 +102,10 @@ See `requirements.txt` for the complete dependency list.
 - High-priority upskilling recommendations identified
 
 ### 5. **Predictive Modeling**
-- **Multiple Linear Regression** model built with PySpark ML
-- **R² Score:** 0.269 (predicting salary from location, job title, skills)
+- **Multiple Linear Regression and Random Forest** model built with PySpark ML
+- **Best R² Score (RF):** 0.566 (predicting salary from occupation, job title, skills, education level among other features)
 - **Key Insight:** Entry-level titles show -$61k to -$75k salary penalties
-- Job title level is a significant predictor of compensation
+- Years of experience is a significant predictor of compensation
 
 ### 6. **Career Strategy**
 - Phased upskilling roadmap to bridge identified skill gaps
