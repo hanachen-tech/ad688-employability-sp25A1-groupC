@@ -31,6 +31,7 @@ This project investigates key research questions in the modern job market:
 ---
 
 ## 📁 Project Structure
+```
 ad688-employability-sp25A1-groupC/ 
 ├── index.qmd # Project home page & executive summary 
 ├── introduction.qmd # Research introduction & context 
@@ -45,6 +46,7 @@ ad688-employability-sp25A1-groupC/
 ├── references.bib # Bibliography 
 ├── styles.css # Custom styling 
 └── docs/ # Generated HTML output
+```
 
 
 ### Key Quarto Files
